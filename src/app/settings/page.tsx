@@ -163,7 +163,7 @@ export default function SettingsPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium">{key.label}</p>
-                              {key.required && (
+                              {key.required === true && (
                                 <Badge variant="secondary" className="bg-red-100 text-red-700 text-xs">
                                   Required
                                 </Badge>
