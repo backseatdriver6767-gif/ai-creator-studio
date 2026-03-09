@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/geist/font";
+import { Geist, Geist_Mono } from "geist/font";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
