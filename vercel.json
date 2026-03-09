@@ -3,10 +3,5 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["iad1"],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "POSTGRES_PRISMA_URL": "@postgres_prisma_url",
-    "NEXT_PUBLIC_APP_URL": "@app_url"
-  }
+  "regions": ["iad1"]
 }
