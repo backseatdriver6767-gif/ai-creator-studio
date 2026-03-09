@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AIPersona {
+  id            String        @id @default(uuid())
+  name          String
+  description   String?
+  appearance    String?
+  voiceConfig   Json?
+  arcadsActorId String?
+  imageUrls     Json?
+  status        PersonaStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  contentPieces  ContentPiece[]
+  campaigns      Campaign[]
+  socialAccounts SocialAccount[]
+}
+
+model ContentPiece {
+  id            String         @id @default(uuid())
+  personaId     String
+  persona       AIPersona      @relation(fields: [personaId], references: [id])
+
+  title         String
+  script        String?
+  voiceAudioUrl String?
+  videoUrl      String?
+  thumbnailUrl  String?
+
+  type          ContentType
+  format        ContentFormat
+  platform      Platform[]
+  duration      Int?
+  aspectRatio   String?
+
+  status        PipelineStatus @default(DRAFT)
+  generationLog Json?
+
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  postIds       Json?
+
+  views         Int?
+  likes         Int?
+  comments      Int?
+  shares        Int?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  campaignId    String?
+  campaign      Campaign?      @relation(fields: [campaignId], references: [id])
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  personaId       String
+  persona         AIPersona      @relation(fields: [personaId], references: [id])
+
+  name            String
+  description     String?
+  niche           String?
+  productUrl      String?
+  checkoutUrl     String?
+  manychatKeyword String?
+
+  contentIdeas    Json?
+  postingSchedule Json?
+  platforms       Platform[]
+
+  status          CampaignStatus @default(DRAFT)
+  startDate       DateTime?
+  endDate         DateTime?
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  contentPieces   ContentPiece[]
+  products        Product[]
+}
+
+model Product {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  price           Int
+  currency        String   @default("usd")
+  stripeProductId String?
+  stripePriceId   String?
+  checkoutUrl     String?
+
+  campaignId      String?
+  campaign        Campaign? @relation(fields: [campaignId], references: [id])
+
+  orders          Order[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  productId         String
+  product           Product     @relation(fields: [productId], references: [id])
+
+  stripeSessionId   String?
+  stripePaymentId   String?
+  amount            Int
+  currency          String      @default("usd")
+  status            OrderStatus @default(PENDING)
+  customerEmail     String?
+  customerName      String?
+
+  source            String?
+  manychatContactId String?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model SocialAccount {
+  id             String    @id @default(uuid())
+  personaId      String
+  persona        AIPersona @relation(fields: [personaId], references: [id])
+
+  platform       Platform
+  username       String
+  accountId      String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiry    DateTime?
+
+  manychatPageId String?
+  lateAccountId  String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model GenerationJob {
+  id             String    @id @default(uuid())
+  contentPieceId String?
+
+  type           JobType
+  status         JobStatus @default(QUEUED)
+
+  externalJobId  String?
+  inputPayload   Json?
+  outputPayload  Json?
+  outputUrl      String?
+
+  error          String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value Json
+}
+
+enum PersonaStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ContentType {
+  REEL
+  STORY
+  POST
+  PODCAST
+  AD
+  TUTORIAL
+}
+
+enum ContentFormat {
+  VIDEO
+  IMAGE
+  CAROUSEL
+  AUDIO
+}
+
+enum Platform {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  FACEBOOK
+  TWITTER
+  LINKEDIN
+}
+
+enum PipelineStatus {
+  DRAFT
+  SCRIPT_READY
+  VOICE_GENERATING
+  VIDEO_GENERATING
+  COMPOSITING
+  READY
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum JobType {
+  VOICE
+  VIDEO_ARCADS
+  VIDEO_KLING
+  VIDEO_SORA
+  VIDEO_HEYGEN
+  IMAGE_NANOBANNA
+  COMPOSITE
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
