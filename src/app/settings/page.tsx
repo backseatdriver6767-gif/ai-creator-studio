@@ -163,22 +163,22 @@ export default function SettingsPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <p className="text-sm font-medium">{key.label}</p>
-                              {key.required === true && (
+                              {'required' in key && key.required && (
                                 <Badge variant="secondary" className="bg-red-100 text-red-700 text-xs">
                                   Required
                                 </Badge>
                               )}
-                              {key.tier === 'premium' && (
+                              {'tier' in key && key.tier === 'premium' && (
                                 <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white text-xs border-0">
                                   Premium
                                 </Badge>
                               )}
-                              {key.tier === 'standard' && (
+                              {'tier' in key && key.tier === 'standard' && (
                                 <Badge className="bg-gradient-to-r from-purple-500 to-blue-500 text-white text-xs border-0">
                                   Standard
                                 </Badge>
                               )}
-                              {key.tier === 'budget' && (
+                              {'tier' in key && key.tier === 'budget' && (
                                 <Badge className="bg-gradient-to-r from-green-500 to-teal-500 text-white text-xs border-0">
                                   Budget
                                 </Badge>
