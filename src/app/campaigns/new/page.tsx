@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateCampaign, usePersonas } from "@/lib/hooks";
 import { toast } from "sonner";
+import { Megaphone, Plus } from "lucide-react";
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -18,34 +18,40 @@ export default function NewCampaignPage() {
   const { data: personasData } = usePersonas("ACTIVE");
   const personas = personasData as { id: string; name: string }[] | undefined;
 
+  const [mode, setMode] = useState<"existing" | "new">("existing");
   const [form, setForm] = useState({
     personaId: "",
+    personaName: "",
     name: "",
-    description: "",
-    niche: "",
-    productUrl: "",
-    manychatKeyword: "",
-    platforms: ["INSTAGRAM"],
   });
-
-  const togglePlatform = (platform: string) => {
-    setForm((prev) => ({
-      ...prev,
-      platforms: prev.platforms.includes(platform)
-        ? prev.platforms.filter((p) => p !== platform)
-        : [...prev.platforms, platform],
-    }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.personaId || !form.name) {
-      toast.error("Persona and campaign name are required");
+    if (!form.name) {
+      toast.error("Campaign name is required");
+      return;
+    }
+    if (mode === "existing" && !form.personaId) {
+      toast.error("Select a persona or create a new one");
+      return;
+    }
+    if (mode === "new" && !form.personaName) {
+      toast.error("Enter a persona name");
       return;
     }
 
     try {
-      const result = await createCampaign.mutateAsync(form) as { id: string };
+      const payload: Record<string, unknown> = {
+        name: form.name,
+        platforms: ["INSTAGRAM"],
+      };
+      if (mode === "existing") {
+        payload.personaId = form.personaId;
+      } else {
+        payload.personaName = form.personaName;
+      }
+
+      const result = (await createCampaign.mutateAsync(payload)) as { id: string };
       toast.success("Campaign created!");
       router.push(`/campaigns/${result.id}`);
     } catch (error) {
@@ -56,103 +62,82 @@ export default function NewCampaignPage() {
   return (
     <div>
       <TopBar title="Create Campaign" />
-      <div className="p-6 max-w-2xl">
+      <div className="p-6 max-w-xl mx-auto">
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Campaign Details</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5" />
+                New Campaign
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Persona</Label>
-                <Select value={form.personaId} onValueChange={(v) => setForm({ ...form, personaId: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select a persona" /></SelectTrigger>
-                  <SelectContent>
-                    {personas?.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <CardContent className="space-y-5">
               <div>
                 <Label>Campaign Name</Label>
                 <Input
-                  placeholder="e.g. AI Tools Launch Campaign"
+                  placeholder="e.g. AI Tools Launch"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  autoFocus
                 />
               </div>
-              <div>
-                <Label>Description</Label>
-                <Textarea
-                  placeholder="Campaign objectives and strategy..."
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label>Niche</Label>
-                <Input
-                  placeholder="e.g. AI Tools, Beauty, Real Estate"
-                  value={form.niche}
-                  onChange={(e) => setForm({ ...form, niche: e.target.value })}
-                />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Monetization</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
               <div>
-                <Label>Product URL</Label>
-                <Input
-                  placeholder="Link to what you're selling"
-                  value={form.productUrl}
-                  onChange={(e) => setForm({ ...form, productUrl: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>ManyChat Keyword</Label>
-                <Input
-                  placeholder="e.g. AI, GUIDE, LINK"
-                  value={form.manychatKeyword}
-                  onChange={(e) => setForm({ ...form, manychatKeyword: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  When users comment this keyword, ManyChat will auto-DM them with the product link
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Platforms</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                {["INSTAGRAM", "TIKTOK", "YOUTUBE", "FACEBOOK", "TWITTER", "LINKEDIN"].map((p) => (
+                <Label>Persona</Label>
+                <div className="flex gap-2 mb-3">
                   <Button
-                    key={p}
                     type="button"
-                    variant={form.platforms.includes(p) ? "default" : "outline"}
+                    variant={mode === "existing" ? "default" : "outline"}
                     size="sm"
-                    onClick={() => togglePlatform(p)}
+                    onClick={() => setMode("existing")}
                   >
-                    {p}
+                    Select Existing
                   </Button>
-                ))}
+                  <Button
+                    type="button"
+                    variant={mode === "new" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMode("new")}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Create New
+                  </Button>
+                </div>
+
+                {mode === "existing" ? (
+                  <Select
+                    value={form.personaId}
+                    onValueChange={(v) => setForm({ ...form, personaId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a persona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {personas?.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    placeholder="e.g. Sophia Blake"
+                    value={form.personaName}
+                    onChange={(e) => setForm({ ...form, personaName: e.target.value })}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
 
           <div className="flex gap-3">
-            <Button type="submit" disabled={createCampaign.isPending}>
-              {createCampaign.isPending ? "Creating..." : "Create Campaign"}
+            <Button
+              type="submit"
+              disabled={createCampaign.isPending}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+            >
+              {createCampaign.isPending ? "Creating..." : "Create & Open Builder"}
             </Button>
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel

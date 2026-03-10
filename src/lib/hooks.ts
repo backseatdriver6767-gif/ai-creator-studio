@@ -170,6 +170,14 @@ export function useCreateCampaign() {
   });
 }
 
+export function useCampaignBuilder(id: string) {
+  return useQuery({
+    queryKey: ["campaigns", id],
+    queryFn: () => fetcher(`/api/campaigns/${id}`),
+    enabled: !!id,
+  });
+}
+
 export function useUpdateCampaign(id: string) {
   const qc = useQueryClient();
   return useMutation({

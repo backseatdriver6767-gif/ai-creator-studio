@@ -2,17 +2,26 @@
 
 import { TopBar } from "@/components/layout/top-bar";
 import { KPICard } from "@/components/shared/kpi-card";
-import { useAnalytics } from "@/lib/hooks";
-import { Users, Film, Megaphone, DollarSign, Eye, Heart, MessageSquare, Share2, ExternalLink, Upload, Download } from "lucide-react";
+import { useAnalytics, useCampaigns } from "@/lib/hooks";
+import { Users, Film, Megaphone, DollarSign, Eye, Heart, MessageSquare, Share2, ExternalLink, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
 import Link from "next/link";
 
 export default function DashboardPage() {
   const { data, isLoading } = useAnalytics();
+  const { data: campaignsData } = useCampaigns();
+
+  const campaigns = campaignsData as {
+    id: string;
+    name: string;
+    status: string;
+    platforms: string[];
+    persona: { id: string; name: string };
+    _count: { contentPieces: number; products: number };
+  }[] | undefined;
 
   if (isLoading) {
     return (
@@ -42,55 +51,32 @@ export default function DashboardPage() {
     <div>
       <TopBar title="Dashboard" />
       <div className="p-6 space-y-6">
-        {/* 3-Step Workflow */}
+        {/* Campaign CTA */}
         <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
-          <CardHeader>
-            <CardTitle>Create & Publish AI Videos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="flex gap-4 items-start">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
-                  <span className="text-lg font-bold text-white">1</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">Create in HeyGen</h3>
-                  <p className="text-sm text-muted-foreground mb-2">Create your AI avatar video in HeyGen&apos;s studio</p>
+          <CardContent className="py-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold mb-1">Create & Monetize AI Content</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Build a campaign: create your persona, upload your HeyGen video, add a product, and publish.
+                </p>
+                <div className="flex gap-3">
+                  <Link href="/campaigns/new">
+                    <Button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Campaign
+                    </Button>
+                  </Link>
                   <a href={heygenLink} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" variant="outline">
+                    <Button variant="outline">
                       <ExternalLink className="h-3 w-3 mr-1" />
                       Open HeyGen
                     </Button>
                   </a>
                 </div>
               </div>
-              <div className="flex gap-4 items-start">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
-                  <span className="text-lg font-bold text-white">2</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">Download Video</h3>
-                  <p className="text-sm text-muted-foreground mb-2">Download the finished MP4 from HeyGen</p>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Download className="h-3 w-3" />
-                    MP4 or MOV format
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-4 items-start">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
-                  <span className="text-lg font-bold text-white">3</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-1">Upload & Publish</h3>
-                  <p className="text-sm text-muted-foreground mb-2">Upload your video and publish to all platforms</p>
-                  <Link href="/content/new">
-                    <Button size="sm">
-                      <Upload className="h-3 w-3 mr-1" />
-                      Upload Video
-                    </Button>
-                  </Link>
-                </div>
+              <div className="hidden md:flex items-center gap-2 text-5xl">
+                <Megaphone className="h-16 w-16 text-purple-300" />
               </div>
             </div>
           </CardContent>
@@ -130,34 +116,52 @@ export default function DashboardPage() {
           <KPICard title="Total Shares" value={analytics?.engagement.shares ?? 0} icon={Share2} />
         </div>
 
-        {/* Recent Published Content */}
+        {/* Recent Campaigns */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Published Content</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Recent Campaigns</CardTitle>
+              <Link href="/campaigns">
+                <Button variant="outline" size="sm">View All</Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
-            {!analytics?.recentContent?.length ? (
-              <p className="text-sm text-muted-foreground">No published content yet</p>
+            {!campaigns?.length ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground mb-3">No campaigns yet</p>
+                <Link href="/campaigns/new">
+                  <Button variant="outline">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Campaign
+                  </Button>
+                </Link>
+              </div>
             ) : (
               <div className="space-y-3">
-                {analytics.recentContent.map((piece) => (
-                  <div key={piece.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium text-sm">{piece.title}</p>
-                      <div className="flex gap-1 mt-1">
-                        {piece.platform.map((p) => (
-                          <StatusBadge key={p} status={p} />
-                        ))}
+                {campaigns.slice(0, 5).map((campaign) => (
+                  <Link key={campaign.id} href={`/campaigns/${campaign.id}`}>
+                    <div className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Megaphone className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium text-sm">{campaign.name}</p>
+                          <p className="text-xs text-muted-foreground">{campaign.persona.name}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                          {campaign.platforms.map((p) => (
+                            <StatusBadge key={p} status={p} />
+                          ))}
+                        </div>
+                        <StatusBadge status={campaign.status} />
+                        <div className="text-xs text-muted-foreground">
+                          {campaign._count.contentPieces} content
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      {piece.publishedAt && format(new Date(piece.publishedAt), "MMM d, yyyy")}
-                      <div className="flex gap-3 mt-1">
-                        <span>{piece.views ?? 0} views</span>
-                        <span>{piece.likes ?? 0} likes</span>
-                      </div>
-                    </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

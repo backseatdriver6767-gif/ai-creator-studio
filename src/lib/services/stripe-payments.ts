@@ -26,6 +26,16 @@ export async function createProduct(
   return { productId: product.id, priceId: price.id };
 }
 
+export async function createPaymentLink(
+  priceId: string
+): Promise<{ url: string; id: string }> {
+  const stripe = getStripe();
+  const link = await stripe.paymentLinks.create({
+    line_items: [{ price: priceId, quantity: 1 }],
+  });
+  return { url: link.url, id: link.id };
+}
+
 export async function createCheckoutSession(
   priceId: string,
   successUrl: string,

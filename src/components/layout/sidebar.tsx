@@ -5,10 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  Users,
-  Film,
   Megaphone,
-  ShoppingBag,
   BarChart3,
   Settings,
   Sparkles,
@@ -16,10 +13,7 @@ import {
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/personas", label: "Personas", icon: Users },
-  { href: "/content", label: "Content", icon: Film },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
-  { href: "/products", label: "Products", icon: ShoppingBag },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -11,7 +11,7 @@ export async function GET(
     include: {
       persona: true,
       contentPieces: { orderBy: { createdAt: "desc" } },
-      products: true,
+      products: { include: { _count: { select: { orders: true } } } },
     },
   });
 

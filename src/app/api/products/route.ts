@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
     stripeProductId = stripeResult.productId;
     stripePriceId = stripeResult.priceId;
 
-    // We'll store the priceId for generating checkout links later.
-    // Don't create a session here - sessions are single-use.
-    // Instead, generate a reusable payment link or create sessions on demand.
+    // Create a reusable Payment Link
+    const paymentLink = await stripePayments.createPaymentLink(stripeResult.priceId);
+    checkoutUrl = paymentLink.url;
   }
 
   const product = await prisma.product.create({

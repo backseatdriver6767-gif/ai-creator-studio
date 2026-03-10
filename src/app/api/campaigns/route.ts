@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
     include: {
       persona: { select: { id: true, name: true } },
+      contentPieces: { select: { id: true, status: true } },
+      products: { select: { id: true, name: true, price: true, checkoutUrl: true } },
       _count: { select: { contentPieces: true, products: true } },
     },
   });
@@ -24,9 +26,26 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const body = await req.json();
 
+  // Support inline persona creation: if personaName provided (no personaId), create persona first
+  let personaId = body.personaId;
+  if (!personaId && body.personaName) {
+    const persona = await prisma.aIPersona.create({
+      data: {
+        name: body.personaName,
+        description: body.personaDescription || null,
+        status: "ACTIVE",
+      },
+    });
+    personaId = persona.id;
+  }
+
+  if (!personaId) {
+    return NextResponse.json({ error: "personaId or personaName is required" }, { status: 400 });
+  }
+
   const campaign = await prisma.campaign.create({
     data: {
-      personaId: body.personaId,
+      personaId,
       name: body.name,
       description: body.description,
       niche: body.niche,
@@ -38,6 +57,9 @@ export async function POST(req: NextRequest) {
       platforms: body.platforms,
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       endDate: body.endDate ? new Date(body.endDate) : undefined,
+    },
+    include: {
+      persona: true,
     },
   });
 
