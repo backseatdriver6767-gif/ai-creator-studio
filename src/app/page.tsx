@@ -2,17 +2,17 @@
 
 import { TopBar } from "@/components/layout/top-bar";
 import { KPICard } from "@/components/shared/kpi-card";
-import { useAnalytics, useUsage } from "@/lib/hooks";
-import { Users, Film, Megaphone, DollarSign, Eye, Heart, MessageSquare, Share2, CheckCircle, XCircle, Activity } from "lucide-react";
+import { useAnalytics } from "@/lib/hooks";
+import { Users, Film, Megaphone, DollarSign, Eye, Heart, MessageSquare, Share2, ExternalLink, Upload, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { data, isLoading } = useAnalytics();
-  const { data: usageData } = useUsage();
 
   if (isLoading) {
     return (
@@ -36,16 +36,66 @@ export default function DashboardPage() {
     recentContent: { id: string; title: string; views: number | null; likes: number | null; comments: number | null; shares: number | null; platform: string[]; publishedAt: string | null }[];
   } | undefined;
 
-  const usage = usageData as {
-    services: { service: string; total: number; completed: number; failed: number; processing: number }[];
-    recentJobs: { id: string; type: string; status: string; createdAt: string; completedAt: string | null; error: string | null }[];
-    apiStatus: Record<string, { configured: boolean; name: string }>;
-  } | undefined;
+  const heygenLink = process.env.NEXT_PUBLIC_HEYGEN_AFFILIATE_LINK || "https://app.heygen.com";
 
   return (
     <div>
       <TopBar title="Dashboard" />
       <div className="p-6 space-y-6">
+        {/* 3-Step Workflow */}
+        <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
+          <CardHeader>
+            <CardTitle>Create & Publish AI Videos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="flex gap-4 items-start">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
+                  <span className="text-lg font-bold text-white">1</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Create in HeyGen</h3>
+                  <p className="text-sm text-muted-foreground mb-2">Create your AI avatar video in HeyGen&apos;s studio</p>
+                  <a href={heygenLink} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline">
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Open HeyGen
+                    </Button>
+                  </a>
+                </div>
+              </div>
+              <div className="flex gap-4 items-start">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
+                  <span className="text-lg font-bold text-white">2</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Download Video</h3>
+                  <p className="text-sm text-muted-foreground mb-2">Download the finished MP4 from HeyGen</p>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Download className="h-3 w-3" />
+                    MP4 or MOV format
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-4 items-start">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
+                  <span className="text-lg font-bold text-white">3</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Upload & Publish</h3>
+                  <p className="text-sm text-muted-foreground mb-2">Upload your video and publish to all platforms</p>
+                  <Link href="/content/new">
+                    <Button size="sm">
+                      <Upload className="h-3 w-3 mr-1" />
+                      Upload Video
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* KPIs */}
         <div className="grid gap-4 grid-cols-4">
           <KPICard
@@ -79,101 +129,6 @@ export default function DashboardPage() {
           <KPICard title="Total Comments" value={analytics?.engagement.comments ?? 0} icon={MessageSquare} />
           <KPICard title="Total Shares" value={analytics?.engagement.shares ?? 0} icon={Share2} />
         </div>
-
-        <div className="grid gap-4 grid-cols-2">
-          {/* API Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                API Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {usage?.apiStatus ? (
-                <div className="space-y-2">
-                  {Object.entries(usage.apiStatus).map(([key, api]) => (
-                    <div key={key} className="flex items-center justify-between py-1">
-                      <span className="text-sm">{api.name}</span>
-                      {api.configured ? (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700 gap-1">
-                          <CheckCircle className="h-3 w-3" />
-                          Connected
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="bg-gray-100 text-gray-500 gap-1">
-                          <XCircle className="h-3 w-3" />
-                          Not configured
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Loading...</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* API Usage by Service */}
-          <Card>
-            <CardHeader>
-              <CardTitle>API Usage</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!usage?.services?.length ? (
-                <p className="text-sm text-muted-foreground">No API calls yet. Generate content to see usage.</p>
-              ) : (
-                <div className="space-y-3">
-                  {usage.services.map((svc) => (
-                    <div key={svc.service} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{svc.service}</span>
-                        <span className="text-muted-foreground">{svc.total} calls</span>
-                      </div>
-                      <div className="flex gap-2 text-xs">
-                        <span className="text-green-600">{svc.completed} completed</span>
-                        {svc.processing > 0 && (
-                          <span className="text-purple-600">{svc.processing} in progress</span>
-                        )}
-                        {svc.failed > 0 && (
-                          <span className="text-red-600">{svc.failed} failed</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Jobs */}
-        {usage?.recentJobs && usage.recentJobs.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Generation Jobs</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {usage.recentJobs.slice(0, 10).map((job) => (
-                  <div key={job.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div className="flex items-center gap-3">
-                      <StatusBadge status={job.type} />
-                      <StatusBadge status={job.status} />
-                    </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      {format(new Date(job.createdAt), "MMM d, h:mm a")}
-                      {job.error && (
-                        <p className="text-red-500 mt-0.5 max-w-48 truncate">{job.error}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Recent Published Content */}
         <Card>

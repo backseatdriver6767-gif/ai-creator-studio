@@ -105,32 +105,16 @@ export function useUpdateContent(id: string) {
   });
 }
 
-export function useGenerateScript(id: string) {
+export function useUploadVideo(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      mutator(`/api/content/${id}/generate-script`, { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["content", id] }),
-  });
-}
-
-export function useGenerateVoice(id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () =>
-      mutator(`/api/content/${id}/generate-voice`, { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["content", id] }),
-  });
-}
-
-export function useGenerateVideo(id: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (provider?: string) =>
-      mutator(`/api/content/${id}/generate-video`, {
-        method: "POST",
-        body: JSON.stringify({ provider: provider || "kling" }),
-      }),
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("video", file);
+      const res = await fetch(`/api/content/${id}/upload`, { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["content", id] }),
   });
 }
@@ -220,60 +204,6 @@ export function useAnalytics() {
     queryKey: ["analytics"],
     queryFn: () => fetcher("/api/analytics"),
     refetchInterval: 60000,
-  });
-}
-
-// ---- Generation ----
-
-export function useGenerateIdeas() {
-  return useMutation({
-    mutationFn: (data: { personaName: string; niche: string; count?: number }) =>
-      mutator("/api/generate/ideas", { method: "POST", body: JSON.stringify(data) }),
-  });
-}
-
-export function useGenerateScriptStandalone() {
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) =>
-      mutator("/api/generate/script", { method: "POST", body: JSON.stringify(data) }),
-  });
-}
-
-// ---- Voices ----
-
-export function useVoices() {
-  return useQuery({
-    queryKey: ["voices"],
-    queryFn: () => fetcher("/api/voices"),
-  });
-}
-
-export function useDesignVoice() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { prompt: string; name: string }) =>
-      mutator("/api/voices/design", { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["voices"] }),
-  });
-}
-
-// ---- Actors ----
-
-export function useActors() {
-  return useQuery({
-    queryKey: ["actors"],
-    queryFn: () => fetcher("/api/actors"),
-  });
-}
-
-// ---- Jobs ----
-
-export function useJob(id: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: ["jobs", id],
-    queryFn: () => fetcher(`/api/jobs/${id}`),
-    enabled: !!id && enabled,
-    refetchInterval: 5000,
   });
 }
 

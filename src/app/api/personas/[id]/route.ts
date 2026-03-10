@@ -16,6 +16,7 @@ export async function GET(
   });
 
   if (!persona) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   return NextResponse.json(persona);
 }
 
@@ -31,10 +32,6 @@ export async function PUT(
     data: {
       name: body.name,
       description: body.description,
-      appearance: body.appearance,
-      voiceConfig: body.voiceConfig,
-      arcadsActorId: body.arcadsActorId,
-      imageUrls: body.imageUrls,
       status: body.status,
     },
   });

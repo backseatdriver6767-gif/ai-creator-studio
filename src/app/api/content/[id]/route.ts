@@ -10,7 +10,9 @@ export async function GET(
     where: { id },
     include: {
       persona: true,
-      campaign: true,
+      campaign: {
+        include: { products: true },
+      },
     },
   });
 
@@ -29,7 +31,7 @@ export async function PUT(
     where: { id },
     data: {
       title: body.title,
-      script: body.script,
+      caption: body.caption,
       type: body.type,
       format: body.format,
       platform: body.platform,
@@ -37,7 +39,7 @@ export async function PUT(
       aspectRatio: body.aspectRatio,
       status: body.status,
       scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
-      campaignId: body.campaignId,
+      campaignId: body.campaignId !== undefined ? body.campaignId : undefined,
     },
   });
 

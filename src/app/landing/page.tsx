@@ -8,7 +8,7 @@ import {
   Sparkles,
   Zap,
   TrendingUp,
-  Video,
+  Upload,
   DollarSign,
   BarChart3,
   CheckCircle2,
@@ -19,16 +19,17 @@ import {
   Shield,
   Rocket,
   Star,
-  Crown,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function LandingPage() {
+  const heygenLink = process.env.NEXT_PUBLIC_HEYGEN_AFFILIATE_LINK || "https://app.heygen.com";
+
   const features = [
     {
-      icon: Video,
-      title: "AI Video Generation",
-      description: "Choose from 3 tiers: Premium (Arcads), Standard (HeyGen), or Budget (Kling). Professional AI avatars at any price point.",
+      icon: Upload,
+      title: "Upload & Publish",
+      description: "Create videos in HeyGen, download the MP4, upload here. We handle the rest — Instagram, TikTok, YouTube.",
     },
     {
       icon: Megaphone,
@@ -47,40 +48,13 @@ export default function LandingPage() {
     },
     {
       icon: Sparkles,
-      title: "AI Content Creation",
-      description: "Claude writes your scripts, GPT-4o analyzes images, ElevenLabs creates voices. Fully automated.",
+      title: "Powered by HeyGen",
+      description: "Create stunning AI avatar videos with HeyGen. Realistic avatars, natural voices, professional quality.",
     },
     {
       icon: Shield,
       title: "Production Ready",
       description: "Built with Next.js 16, TypeScript, Prisma 7, and Tailwind. Deploy to Vercel in 1 click.",
-    },
-  ];
-
-  const tiers = [
-    {
-      icon: Crown,
-      badge: "Premium",
-      badgeColor: "bg-gradient-to-r from-yellow-400 to-orange-500 text-white",
-      name: "Arcads AI",
-      description: "Photorealistic avatars, enterprise quality",
-      bestFor: "Professional ads & high-converting content",
-    },
-    {
-      icon: Star,
-      badge: "Standard",
-      badgeColor: "bg-gradient-to-r from-purple-500 to-blue-500 text-white",
-      name: "HeyGen",
-      description: "Great quality, ElevenLabs voices included",
-      bestFor: "Social media & personal branding",
-    },
-    {
-      icon: Zap,
-      badge: "Budget",
-      badgeColor: "bg-gradient-to-r from-green-500 to-teal-500 text-white",
-      name: "Kling + ElevenLabs",
-      description: "Cost-effective cinematic video",
-      bestFor: "Testing & high-volume content",
     },
   ];
 
@@ -92,13 +66,13 @@ export default function LandingPage() {
     },
     {
       number: "2",
-      title: "Connect Your AI Services",
-      description: "Choose your video tier, connect social accounts, set up Stripe. Guided onboarding walks you through.",
+      title: "Connect Your Accounts",
+      description: "Link your Instagram, set up Stripe for payments, and configure ManyChat for DM automation.",
     },
     {
       number: "3",
-      title: "Create & Sell",
-      description: "Generate AI videos, post to social media, sell with ManyChat automation. Start making money today.",
+      title: "Upload & Profit",
+      description: "Create videos in HeyGen, upload them here, publish everywhere, and start making money.",
     },
   ];
 
@@ -115,7 +89,7 @@ export default function LandingPage() {
           >
             <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium">
               <Sparkles className="h-4 w-4" />
-              <span>Launch Your AI Content Empire Today</span>
+              <span>Create AI Videos in HeyGen. Automate Everything Else.</span>
             </div>
 
             <h1 className="text-6xl md:text-7xl font-bold tracking-tight">
@@ -125,7 +99,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="text-2xl md:text-3xl text-muted-foreground max-w-3xl mx-auto font-medium">
-              Create AI videos. Post everywhere. Make money.
+              Upload videos. Auto-post everywhere. Make money.
               <br />
               <span className="text-foreground font-bold">All in one platform.</span>
             </p>
@@ -178,7 +152,7 @@ export default function LandingPage() {
           <div className="text-center space-y-4">
             <h2 className="text-4xl md:text-5xl font-bold">Everything You Need to Win</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Full-stack AI content creation and monetization platform. Built for creators who want to make money.
+              Upload your HeyGen videos, publish everywhere, and monetize with built-in payments and automation.
             </p>
           </div>
 
@@ -206,47 +180,74 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Video Tiers Section */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl md:text-5xl font-bold">Choose Your Video Quality</h2>
+      {/* HeyGen Section */}
+      <section className="py-20 px-6 bg-gradient-to-br from-blue-50 to-purple-50">
+        <div className="max-w-4xl mx-auto space-y-8">
+          <div className="text-center space-y-6">
+            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 text-lg px-6 py-2">
+              Powered by HeyGen
+            </Badge>
+            <h2 className="text-4xl md:text-5xl font-bold">
+              Create AI Videos in HeyGen
+            </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Three tiers to match your quality needs and budget. Switch anytime.
+              Use HeyGen&apos;s studio to create stunning AI avatar videos, then upload them here to publish and monetize.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {tiers.map((tier, idx) => (
-              <motion.div
-                key={tier.name}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                viewport={{ once: true }}
-              >
-                <Card className="h-full border-2 hover:border-purple-300 hover:shadow-xl transition-all">
-                  <CardHeader>
-                    <div className="flex items-center justify-between mb-4">
-                      <tier.icon className="h-10 w-10 text-purple-600" />
-                      <Badge className={`${tier.badgeColor} border-0 font-semibold`}>
-                        {tier.badge}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                    <CardDescription className="text-base">{tier.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="bg-muted rounded-lg p-3">
-                      <p className="text-sm">
-                        <span className="font-semibold">Best For:</span> {tier.bestFor}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+          <Card className="border-2 border-purple-200">
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold">Realistic AI Avatars</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold">Natural Voice Synthesis</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold">Custom Avatar Creation</span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold">Fast Video Generation</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold">Multiple Languages</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="font-semibold">Pay-as-you-go Credits</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
+                <p className="text-sm text-center mb-4 font-medium">
+                  <Star className="h-4 w-4 inline mr-1 text-purple-600" />
+                  New to HeyGen? Create your account and start making videos
+                </p>
+                <div className="flex justify-center">
+                  <a
+                    href={heygenLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button className="gradient-purple-blue text-white">
+                      Create Your HeyGen Account
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 

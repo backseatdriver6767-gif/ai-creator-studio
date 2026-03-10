@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
     data: {
       personaId: body.personaId,
       title: body.title,
-      script: body.script,
+      caption: body.caption,
       type: body.type,
-      format: body.format,
+      format: body.format || "VIDEO",
       platform: body.platform,
       duration: body.duration,
       aspectRatio: body.aspectRatio,

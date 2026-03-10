@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const error = req.nextUrl.searchParams.get("error");
   const personaId = req.nextUrl.searchParams.get("state") || "";
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   if (error) {
     return NextResponse.redirect(`${appUrl}/settings?error=oauth_denied`);

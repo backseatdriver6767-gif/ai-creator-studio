@@ -23,10 +23,6 @@ export async function POST(req: NextRequest) {
     data: {
       name: body.name,
       description: body.description,
-      appearance: body.appearance,
-      voiceConfig: body.voiceConfig,
-      arcadsActorId: body.arcadsActorId,
-      imageUrls: body.imageUrls,
       status: body.status || "DRAFT",
     },
   });

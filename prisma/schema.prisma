@@ -8,16 +8,12 @@ datasource db {
 }
 
 model AIPersona {
-  id            String        @id @default(uuid())
-  name          String
-  description   String?
-  appearance    String?
-  voiceConfig   Json?
-  arcadsActorId String?
-  imageUrls     Json?
-  status        PersonaStatus @default(DRAFT)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  name            String
+  description     String?
+  status          PersonaStatus @default(DRAFT)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   contentPieces  ContentPiece[]
   campaigns      Campaign[]
@@ -30,8 +26,7 @@ model ContentPiece {
   persona       AIPersona      @relation(fields: [personaId], references: [id])
 
   title         String
-  script        String?
-  voiceAudioUrl String?
+  caption       String?
   videoUrl      String?
   thumbnailUrl  String?
 
@@ -42,7 +37,6 @@ model ContentPiece {
   aspectRatio   String?
 
   status        PipelineStatus @default(DRAFT)
-  generationLog Json?
 
   scheduledAt   DateTime?
   publishedAt   DateTime?
@@ -145,26 +139,6 @@ model SocialAccount {
   updatedAt      DateTime  @updatedAt
 }
 
-model GenerationJob {
-  id             String    @id @default(uuid())
-  contentPieceId String?
-
-  type           JobType
-  status         JobStatus @default(QUEUED)
-
-  externalJobId  String?
-  inputPayload   Json?
-  outputPayload  Json?
-  outputUrl      String?
-
-  error          String?
-  startedAt      DateTime?
-  completedAt    DateTime?
-
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-}
-
 model Setting {
   id    String @id @default(uuid())
   key   String @unique
@@ -204,11 +178,7 @@ enum Platform {
 
 enum PipelineStatus {
   DRAFT
-  SCRIPT_READY
-  VOICE_GENERATING
-  VIDEO_GENERATING
-  COMPOSITING
-  READY
+  VIDEO_UPLOADED
   SCHEDULED
   PUBLISHED
   FAILED
@@ -226,21 +196,4 @@ enum OrderStatus {
   COMPLETED
   FAILED
   REFUNDED
-}
-
-enum JobType {
-  VOICE
-  VIDEO_ARCADS
-  VIDEO_KLING
-  VIDEO_SORA
-  VIDEO_HEYGEN
-  IMAGE_NANOBANNA
-  COMPOSITE
-}
-
-enum JobStatus {
-  QUEUED
-  PROCESSING
-  COMPLETED
-  FAILED
 }

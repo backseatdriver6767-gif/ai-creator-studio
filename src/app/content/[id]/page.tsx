@@ -1,86 +1,153 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/top-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   useContentPiece,
-  useGenerateScript,
-  useGenerateVoice,
-  useGenerateVideo,
+  useUpdateContent,
   usePublishContent,
   useScheduleContent,
+  useUploadVideo,
+  useCampaigns,
+  useProducts,
 } from "@/lib/hooks";
+import { VideoUploader } from "@/components/content/video-uploader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import Link from "next/link";
 import {
-  FileText,
-  Mic,
-  Video,
   Send,
   Loader2,
   Calendar,
-  RotateCcw,
-  Volume2,
-  Download,
+  CheckCircle,
+  Circle,
+  User,
+  Film,
+  MessageSquare,
+  Tag,
+  ShoppingBag,
+  Megaphone,
 } from "lucide-react";
+
+type ProductType = {
+  id: string;
+  name: string;
+  price: number;
+  checkoutUrl: string | null;
+};
+
+type CampaignType = {
+  id: string;
+  name: string;
+  manychatKeyword: string | null;
+  products: ProductType[];
+};
+
+type PieceType = {
+  id: string;
+  title: string;
+  caption: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  type: string;
+  format: string;
+  platform: string[];
+  duration: number | null;
+  aspectRatio: string | null;
+  status: string;
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  personaId: string;
+  campaignId: string | null;
+  persona: { id: string; name: string };
+  campaign: CampaignType | null;
+};
 
 export default function ContentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, isLoading } = useContentPiece(id);
-  const generateScript = useGenerateScript(id);
-  const generateVoice = useGenerateVoice(id);
-  const generateVideo = useGenerateVideo(id);
+  const updateContent = useUpdateContent(id);
   const publishContent = usePublishContent(id);
   const scheduleContent = useScheduleContent(id);
+  const uploadVideo = useUploadVideo(id);
 
+  const piece = data as PieceType | undefined;
+
+  // Fetch campaigns for this persona (for campaign selector)
+  const { data: campaignsData } = useCampaigns(
+    piece?.personaId ? { personaId: piece.personaId } : undefined
+  );
+  const campaigns = campaignsData as CampaignType[] | undefined;
+
+  // Fetch all products (for context)
+  const { data: productsData } = useProducts();
+  const allProducts = productsData as ProductType[] | undefined;
+
+  const [caption, setCaption] = useState("");
+  const [captionDirty, setCaptionDirty] = useState(false);
   const [showScheduler, setShowScheduler] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
-  const [videoProvider, setVideoProvider] = useState<string>("heygen");
 
-  const piece = data as {
-    id: string;
-    title: string;
-    script: string | null;
-    voiceAudioUrl: string | null;
-    videoUrl: string | null;
-    thumbnailUrl: string | null;
-    type: string;
-    format: string;
-    platform: string[];
-    duration: number | null;
-    aspectRatio: string | null;
-    status: string;
-    generationLog: Record<string, unknown> | null;
-    scheduledAt: string | null;
-    publishedAt: string | null;
-    views: number | null;
-    likes: number | null;
-    comments: number | null;
-    shares: number | null;
-    persona: { id: string; name: string };
-    campaign: { id: string; name: string } | null;
-  } | undefined;
+  // Sync caption from server data
+  useEffect(() => {
+    if (piece && !captionDirty) {
+      setCaption(piece.caption || "");
+    }
+  }, [piece, captionDirty]);
 
-  const handleAction = async (action: () => Promise<unknown>, label: string) => {
+  const handleUpload = async (file: File) => {
     try {
-      await action();
-      toast.success(`${label} started`);
+      await uploadVideo.mutateAsync(file);
+      toast.success("Video uploaded!");
+    } catch {
+      toast.error("Upload failed");
+    }
+  };
+
+  const handleSaveCaption = async () => {
+    try {
+      await updateContent.mutateAsync({ caption });
+      setCaptionDirty(false);
+      toast.success("Caption saved");
+    } catch {
+      toast.error("Failed to save caption");
+    }
+  };
+
+  const handleCampaignChange = async (campaignId: string) => {
+    try {
+      await updateContent.mutateAsync({
+        campaignId: campaignId === "none" ? null : campaignId,
+      });
+      toast.success(campaignId === "none" ? "Campaign removed" : "Campaign linked");
+    } catch {
+      toast.error("Failed to update campaign");
+    }
+  };
+
+  const handlePublish = async () => {
+    // Auto-save caption if dirty
+    if (captionDirty) {
+      await updateContent.mutateAsync({ caption });
+      setCaptionDirty(false);
+    }
+    try {
+      await publishContent.mutateAsync();
+      toast.success("Published!");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : `${label} failed`);
+      toast.error(error instanceof Error ? error.message : "Publishing failed");
     }
   };
 
@@ -88,6 +155,11 @@ export default function ContentDetailPage({ params }: { params: Promise<{ id: st
     if (!scheduleDate) {
       toast.error("Please select a date and time");
       return;
+    }
+    // Auto-save caption if dirty
+    if (captionDirty) {
+      await updateContent.mutateAsync({ caption });
+      setCaptionDirty(false);
     }
     try {
       await scheduleContent.mutateAsync(scheduleDate);
@@ -119,275 +191,306 @@ export default function ContentDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const isPending = generateScript.isPending || generateVoice.isPending || generateVideo.isPending || publishContent.isPending || scheduleContent.isPending;
-  const isFailed = piece.status === "FAILED";
+  const isPending = publishContent.isPending || scheduleContent.isPending || uploadVideo.isPending || updateContent.isPending;
+  const isPublished = piece.status === "PUBLISHED";
+  const hasVideo = !!piece.videoUrl;
+  const hasCaption = !!(caption || piece.caption);
+  const linkedCampaign = piece.campaign;
+  const linkedProduct = linkedCampaign?.products?.[0];
 
   return (
     <div>
       <TopBar title={piece.title}>
         <StatusBadge status={piece.status} />
       </TopBar>
-      <div className="p-6 space-y-6">
-        {/* Pipeline: Script -> Voice -> Video -> Publish */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Content Pipeline</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Script (Claude) &rarr; {videoProvider === "heygen" ? "Video + Voice (HeyGen)" : "Voice (ElevenLabs) → Video (Kling)"} &rarr; Publish (Instagram)
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-3">
-              {/* Step 1: Script */}
-              <Button
-                onClick={() => handleAction(() => generateScript.mutateAsync(), "Script generation")}
-                disabled={isPending}
-                variant={piece.script ? "outline" : "default"}
-              >
-                {generateScript.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                {piece.script ? "Regenerate Script" : "1. Generate Script"}
-              </Button>
+      <div className="p-6 max-w-3xl space-y-6">
 
-              {/* Step 2: Voice (skip if using HeyGen) */}
-              {videoProvider !== "heygen" && (
-                <Button
-                  onClick={() => handleAction(() => generateVoice.mutateAsync(), "Voice generation")}
-                  disabled={isPending || !piece.script}
-                  variant={piece.voiceAudioUrl ? "outline" : "default"}
-                >
-                  {generateVoice.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mic className="h-4 w-4 mr-2" />}
-                  {piece.voiceAudioUrl ? "Regenerate Voice" : "2. Generate Voice"}
-                </Button>
-              )}
-
-              {/* Step 3: Video */}
-              <div className="flex gap-2">
-                <Select value={videoProvider} onValueChange={setVideoProvider}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="heygen">HeyGen</SelectItem>
-                    <SelectItem value="kling">Kling</SelectItem>
-                    <SelectItem value="arcads">Arcads</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  onClick={() => handleAction(() => generateVideo.mutateAsync(videoProvider), "Video generation")}
-                  disabled={isPending || !piece.script}
-                  variant={piece.videoUrl ? "outline" : "default"}
-                >
-                  {generateVideo.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Video className="h-4 w-4 mr-2" />}
-                  {piece.videoUrl ? "Regenerate Video" : "3. Generate Video"}
-                </Button>
-              </div>
-
-              <Separator orientation="vertical" className="h-9" />
-
-              {/* Step 4: Publish */}
-              <Button
-                onClick={() => handleAction(() => publishContent.mutateAsync(), "Publishing")}
-                disabled={isPending || !piece.videoUrl}
-              >
-                {publishContent.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                4. Publish
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowScheduler(!showScheduler)}
-                disabled={isPending || !piece.videoUrl}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Schedule
-              </Button>
-            </div>
-
-            {/* Schedule picker */}
-            {showScheduler && (
-              <div className="flex items-end gap-3 pt-2 border-t">
-                <div className="flex-1">
-                  <Label>Schedule Date & Time</Label>
-                  <Input
-                    type="datetime-local"
-                    value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
-                    min={new Date().toISOString().slice(0, 16)}
-                  />
-                </div>
-                <Button
-                  onClick={handleSchedule}
-                  disabled={scheduleContent.isPending || !scheduleDate}
-                >
-                  {scheduleContent.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Confirm Schedule
-                </Button>
-              </div>
+        {/* ===== PUBLISHED VIEW ===== */}
+        {isPublished ? (
+          <>
+            {/* Video */}
+            {piece.videoUrl && (
+              <Card>
+                <CardContent className="pt-6">
+                  <video src={piece.videoUrl} controls className="w-full max-w-md rounded-lg" />
+                </CardContent>
+              </Card>
             )}
 
-            {/* Retry on failure */}
-            {isFailed && (
-              <div className="flex items-center gap-3 pt-2 border-t">
-                <span className="text-sm text-red-600">Pipeline failed.</span>
-                <Button variant="outline" size="sm" onClick={() => handleAction(() => generateScript.mutateAsync(), "Retry script")}>
-                  <RotateCcw className="h-3 w-3 mr-1" /> Retry Script
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleAction(() => generateVoice.mutateAsync(), "Retry voice")}>
-                  <RotateCcw className="h-3 w-3 mr-1" /> Retry Voice
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleAction(() => generateVideo.mutateAsync(videoProvider), "Retry video")}>
-                  <RotateCcw className="h-3 w-3 mr-1" /> Retry Video
-                </Button>
-              </div>
+            {/* Caption */}
+            {piece.caption && (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Caption</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="text-sm whitespace-pre-wrap">{piece.caption}</p>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
 
-        <div className="grid gap-4 grid-cols-2">
-          {/* Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Persona</span>
-                <Link href={`/personas/${piece.persona.id}`} className="hover:underline">{piece.persona.name}</Link>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Type</span>
-                <StatusBadge status={piece.type} />
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Format</span>
-                <span>{piece.format}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Platforms</span>
-                <div className="flex gap-1">{piece.platform.map((p) => <StatusBadge key={p} status={p} />)}</div>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Duration</span>
-                <span>{piece.duration ? `${piece.duration}s` : "N/A"}</span>
-              </div>
-              {piece.scheduledAt && (
-                <>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Scheduled</span>
-                    <span>{new Date(piece.scheduledAt).toLocaleString()}</span>
-                  </div>
-                </>
-              )}
-              {piece.publishedAt && (
-                <>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Published</span>
-                    <span>{new Date(piece.publishedAt).toLocaleString()}</span>
-                  </div>
-                </>
-              )}
-              {piece.campaign && (
-                <>
-                  <Separator />
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Campaign</span>
-                    <Link href={`/campaigns/${piece.campaign.id}`} className="hover:underline">{piece.campaign.name}</Link>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Performance */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {piece.status === "PUBLISHED" ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 rounded-lg bg-muted">
-                    <p className="text-2xl font-bold">{piece.views ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">Views</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-muted">
-                    <p className="text-2xl font-bold">{piece.likes ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">Likes</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-muted">
-                    <p className="text-2xl font-bold">{piece.comments ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">Comments</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-muted">
-                    <p className="text-2xl font-bold">{piece.shares ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">Shares</p>
-                  </div>
+            {/* Performance */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Performance</CardTitle></CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 gap-4">
+                  {[
+                    { label: "Views", value: piece.views ?? 0 },
+                    { label: "Likes", value: piece.likes ?? 0 },
+                    { label: "Comments", value: piece.comments ?? 0 },
+                    { label: "Shares", value: piece.shares ?? 0 },
+                  ].map((m) => (
+                    <div key={m.label} className="text-center p-3 rounded-lg bg-muted">
+                      <p className="text-2xl font-bold">{m.value}</p>
+                      <p className="text-xs text-muted-foreground">{m.label}</p>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Available after publishing</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
 
-        {/* Script */}
-        {piece.script && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Script</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg">{piece.script}</pre>
-            </CardContent>
-          </Card>
-        )}
+            {/* Details */}
+            <Card>
+              <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Persona</span>
+                  <Link href={`/personas/${piece.persona.id}`} className="hover:underline">{piece.persona.name}</Link>
+                </div>
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Platforms</span>
+                  <div className="flex gap-1">{piece.platform.map((p) => <StatusBadge key={p} status={p} />)}</div>
+                </div>
+                {piece.publishedAt && (
+                  <>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Published</span>
+                      <span>{new Date(piece.publishedAt).toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+                {linkedCampaign && (
+                  <>
+                    <Separator />
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Campaign</span>
+                      <Link href={`/campaigns/${linkedCampaign.id}`} className="hover:underline">{linkedCampaign.name}</Link>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            {/* ===== PRE-PUBLISH FLOW ===== */}
 
-        {/* Audio preview */}
-        {piece.voiceAudioUrl && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Volume2 className="h-4 w-4" />
-                  Voice Audio
+            {/* Video Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  {hasVideo ? <CheckCircle className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
+                  Video
                 </CardTitle>
-                <a href={piece.voiceAudioUrl} download={`${piece.title}-audio.mp3`}>
-                  <Button variant="outline" size="sm">
-                    <Download className="h-3 w-3 mr-1" /> Download
-                  </Button>
-                </a>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <audio controls className="w-full" src={piece.voiceAudioUrl}>
-                Your browser does not support the audio element.
-              </audio>
-            </CardContent>
-          </Card>
-        )}
+              </CardHeader>
+              <CardContent>
+                <VideoUploader
+                  onUpload={handleUpload}
+                  isUploading={uploadVideo.isPending}
+                  currentVideoUrl={piece.videoUrl}
+                />
+              </CardContent>
+            </Card>
 
-        {/* Video preview */}
-        {piece.videoUrl && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Video Preview</CardTitle>
-                <a href={piece.videoUrl} download={`${piece.title}-video.mp4`}>
-                  <Button variant="outline" size="sm">
-                    <Download className="h-3 w-3 mr-1" /> Download
+            {/* Caption Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  {hasCaption ? <CheckCircle className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
+                  Caption & Hashtags
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  placeholder={"Write your Instagram caption here...\n\nAdd your CTA (e.g. \"Comment 'AI' for the link\")\n\n#AI #ContentCreator #HeyGen"}
+                  value={caption}
+                  onChange={(e) => { setCaption(e.target.value); setCaptionDirty(true); }}
+                  rows={5}
+                />
+                {captionDirty && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSaveCaption}
+                    disabled={updateContent.isPending}
+                  >
+                    {updateContent.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                    Save Caption
                   </Button>
-                </a>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <video src={piece.videoUrl} controls className="max-w-md rounded-lg" />
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Campaign & Product Section (Optional) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  {linkedCampaign ? <CheckCircle className="h-5 w-5 text-green-600" /> : <Circle className="h-5 w-5 text-muted-foreground/40" />}
+                  Campaign & Product
+                  <span className="text-xs font-normal text-muted-foreground ml-1">(optional)</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Link to Campaign</Label>
+                  <Select
+                    value={piece.campaignId || "none"}
+                    onValueChange={handleCampaignChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="No campaign" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No campaign</SelectItem>
+                      {campaigns?.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Link to a campaign to enable ManyChat keyword automation and product checkout.
+                  </p>
+                </div>
+
+                {linkedCampaign && (
+                  <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
+                    {linkedCampaign.manychatKeyword && (
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-blue-600" />
+                        <span className="text-muted-foreground">ManyChat keyword:</span>
+                        <code className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">
+                          {linkedCampaign.manychatKeyword}
+                        </code>
+                      </div>
+                    )}
+                    {linkedProduct && (
+                      <div className="flex items-center gap-2">
+                        <ShoppingBag className="h-4 w-4 text-green-600" />
+                        <span className="text-muted-foreground">Product:</span>
+                        <span className="font-medium">{linkedProduct.name}</span>
+                        <span className="text-green-700 font-semibold">${(linkedProduct.price / 100).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {!linkedProduct && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <ShoppingBag className="h-4 w-4" />
+                        <span>No product linked to this campaign yet.</span>
+                        <Link href={`/products/new?campaignId=${linkedCampaign.id}`} className="text-primary hover:underline text-xs">
+                          Add one
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ===== PRE-PUBLISH REVIEW ===== */}
+            {hasVideo && (
+              <Card className="border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50">
+                <CardHeader>
+                  <CardTitle className="text-base">Review & Publish</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Summary Grid */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground w-20">Persona</span>
+                      <span className="text-sm font-medium">{piece.persona.name}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center gap-3">
+                      <Film className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground w-20">Video</span>
+                      <span className="text-sm font-medium text-green-700">Uploaded</span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center gap-3">
+                      <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground w-20">Caption</span>
+                      <span className="text-sm truncate max-w-xs">
+                        {caption ? caption.split("\n")[0].substring(0, 60) + (caption.length > 60 ? "..." : "") : <span className="text-amber-600">No caption set</span>}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center gap-3">
+                      <Megaphone className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground w-20">Campaign</span>
+                      <span className="text-sm">{linkedCampaign ? linkedCampaign.name : <span className="text-muted-foreground">None (optional)</span>}</span>
+                    </div>
+                    {linkedProduct && (
+                      <>
+                        <Separator />
+                        <div className="flex items-center gap-3">
+                          <ShoppingBag className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm text-muted-foreground w-20">Product</span>
+                          <span className="text-sm font-medium">{linkedProduct.name} - ${(linkedProduct.price / 100).toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
+                    <Separator />
+                    <div className="flex items-center gap-3">
+                      <Send className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-muted-foreground w-20">Platforms</span>
+                      <div className="flex gap-1">{piece.platform.map((p) => <StatusBadge key={p} status={p} />)}</div>
+                    </div>
+                  </div>
+
+                  {/* Publish Actions */}
+                  <div className="pt-2 flex gap-3">
+                    <Button
+                      onClick={handlePublish}
+                      disabled={isPending}
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 text-white"
+                    >
+                      {publishContent.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                      Publish Now
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowScheduler(!showScheduler)}
+                      disabled={isPending}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Schedule
+                    </Button>
+                  </div>
+
+                  {showScheduler && (
+                    <div className="flex items-end gap-3 pt-2 border-t">
+                      <div className="flex-1">
+                        <Label>Schedule Date & Time</Label>
+                        <Input
+                          type="datetime-local"
+                          value={scheduleDate}
+                          onChange={(e) => setScheduleDate(e.target.value)}
+                          min={new Date().toISOString().slice(0, 16)}
+                        />
+                      </div>
+                      <Button
+                        onClick={handleSchedule}
+                        disabled={scheduleContent.isPending || !scheduleDate}
+                      >
+                        {scheduleContent.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                        Confirm
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
       </div>
     </div>

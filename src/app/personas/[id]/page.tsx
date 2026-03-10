@@ -5,7 +5,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { usePersona, useUpdatePersona, useDesignVoice } from "@/lib/hooks";
+import { usePersona, useUpdatePersona } from "@/lib/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,22 +14,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Film, Plus, Loader2, Mic, Volume2, CheckCircle2, Circle, Image } from "lucide-react";
+import { Film, Plus, CheckCircle2, Circle } from "lucide-react";
 
 export default function PersonaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, isLoading, refetch } = usePersona(id);
+  const { data, isLoading } = usePersona(id);
   const updatePersona = useUpdatePersona(id);
-  const designVoice = useDesignVoice();
 
   const persona = data as {
     id: string;
     name: string;
     description: string | null;
-    appearance: string | null;
-    voiceConfig: { voiceId?: string; voiceName?: string; voicePrompt?: string } | null;
-    arcadsActorId: string | null;
-    imageUrls: string[] | null;
     status: string;
     contentPieces: { id: string; title: string; status: string; type: string }[];
     campaigns: { id: string; name: string; status: string }[];
@@ -37,17 +32,14 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
   } | undefined;
 
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", appearance: "" });
-  const [voicePrompt, setVoicePrompt] = useState("");
+  const [form, setForm] = useState({ name: "", description: "" });
 
   useEffect(() => {
     if (persona) {
       setForm({
         name: persona.name,
         description: persona.description || "",
-        appearance: persona.appearance || "",
       });
-      setVoicePrompt(persona.voiceConfig?.voicePrompt || "");
     }
   }, [persona]);
 
@@ -58,31 +50,6 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
       setEditing(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update");
-    }
-  };
-
-  const handleGenerateVoice = async () => {
-    if (!voicePrompt.trim()) {
-      toast.error("Enter a voice description first");
-      return;
-    }
-    try {
-      const result = await designVoice.mutateAsync({
-        prompt: voicePrompt,
-        name: `${persona?.name || "Persona"} Voice`,
-      }) as { voice_id: string; name: string };
-
-      await updatePersona.mutateAsync({
-        voiceConfig: {
-          voiceId: result.voice_id,
-          voiceName: result.name,
-          voicePrompt,
-        },
-      });
-      toast.success("Voice created and saved!");
-      refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Voice generation failed");
     }
   };
 
@@ -126,7 +93,6 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="voice">Voice</TabsTrigger>
             <TabsTrigger value="content">Content ({persona.contentPieces.length})</TabsTrigger>
             <TabsTrigger value="campaigns">Campaigns ({persona.campaigns.length})</TabsTrigger>
           </TabsList>
@@ -140,12 +106,9 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
               <CardContent>
                 <div className="space-y-3">
                   {[
-                    { done: !!persona.name && !!persona.description, label: "Basic Info", detail: "Name and description", tab: null },
-                    { done: !!persona.appearance, label: "Appearance", detail: "Physical description for video generation", tab: null },
-                    { done: !!persona.voiceConfig?.voiceId, label: "Voice Designed", detail: persona.voiceConfig?.voiceId ? `${persona.voiceConfig.voiceName}` : "Go to Voice tab to design one", tab: "voice" },
-                    { done: !!(persona.imageUrls as string[] | null)?.length, label: "Reference Images", detail: (persona.imageUrls as string[] | null)?.length ? `${(persona.imageUrls as string[]).length} image(s) uploaded` : "Upload reference photos for consistent video", tab: null },
-                    { done: !!persona.socialAccounts.length, label: "Instagram Connected", detail: persona.socialAccounts.length ? `@${persona.socialAccounts[0].username}` : "Go to Settings > Social Accounts", tab: null },
-                    { done: persona.contentPieces.length > 0, label: "First Content Created", detail: persona.contentPieces.length ? `${persona.contentPieces.length} piece(s)` : "Create your first content piece", tab: "content" },
+                    { done: !!persona.name && !!persona.description, label: "Basic Info", detail: "Name and description" },
+                    { done: !!persona.socialAccounts.length, label: "Social Accounts", detail: persona.socialAccounts.length ? `@${persona.socialAccounts[0].username}` : "Connect Instagram, TikTok, or YouTube" },
+                    { done: persona.contentPieces.length > 0, label: "First Content", detail: persona.contentPieces.length ? `${persona.contentPieces.length} piece(s) created` : "Upload your first video" },
                   ].map((step, i) => (
                     <div key={i} className="flex items-start gap-3">
                       {step.done ? (
@@ -161,12 +124,9 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
                   ))}
                 </div>
                 {(() => {
-                  const total = 6;
+                  const total = 3;
                   const done = [
                     !!persona.name && !!persona.description,
-                    !!persona.appearance,
-                    !!persona.voiceConfig?.voiceId,
-                    !!(persona.imageUrls as string[] | null)?.length,
                     !!persona.socialAccounts.length,
                     persona.contentPieces.length > 0,
                   ].filter(Boolean).length;
@@ -213,62 +173,6 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Appearance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {editing ? (
-                    <Textarea value={form.appearance} onChange={(e) => setForm({ ...form, appearance: e.target.value })} rows={4} />
-                  ) : (
-                    <p className="text-sm line-clamp-6">{persona.appearance || "Not configured"}</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Volume2 className="h-4 w-4" />
-                    Voice
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {persona.voiceConfig?.voiceId ? (
-                    <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span>{persona.voiceConfig.voiceName}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Consistent ElevenLabs voice for all content</p>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No voice designed yet &mdash; go to Voice tab</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Image className="h-4 w-4" />
-                    Reference Images
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {(persona.imageUrls as string[] | null)?.length ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span>{(persona.imageUrls as string[]).length} image(s) uploaded</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No reference images &mdash; upload photos for consistent video generation</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
                   <CardTitle className="text-base">Social Accounts</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -288,59 +192,6 @@ export default function PersonaDetailPage({ params }: { params: Promise<{ id: st
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="voice" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Mic className="h-4 w-4" />
-                  Voice Design (ElevenLabs)
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Design a custom voice for this persona. Once created, the same voice is used across all content for consistency.
-                </p>
-                <div>
-                  <Label>Voice Description</Label>
-                  <Textarea
-                    placeholder="Describe the voice you want, e.g.: A warm, confident female voice in her mid-20s. Slightly raspy with a friendly, conversational tone. American accent. Medium pace, engaging and enthusiastic."
-                    value={voicePrompt}
-                    onChange={(e) => setVoicePrompt(e.target.value)}
-                    rows={4}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Be specific about age, gender, accent, tone, pace, and personality.
-                  </p>
-                </div>
-
-                <Button
-                  onClick={handleGenerateVoice}
-                  disabled={designVoice.isPending || !voicePrompt.trim()}
-                >
-                  {designVoice.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Volume2 className="h-4 w-4 mr-2" />
-                  )}
-                  {persona.voiceConfig?.voiceId ? "Redesign Voice" : "Design Voice"}
-                </Button>
-
-                {persona.voiceConfig?.voiceId && (
-                  <div className="rounded-lg border p-4 space-y-2">
-                    <p className="text-sm font-medium">Current Voice</p>
-                    <div className="text-sm space-y-1">
-                      <p><span className="text-muted-foreground">Name:</span> {persona.voiceConfig.voiceName}</p>
-                      <p><span className="text-muted-foreground">Voice ID:</span> <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{persona.voiceConfig.voiceId}</code></p>
-                      {persona.voiceConfig.voicePrompt && (
-                        <p><span className="text-muted-foreground">Description:</span> {persona.voiceConfig.voicePrompt}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="content" className="mt-4">
