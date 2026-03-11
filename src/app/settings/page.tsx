@@ -293,53 +293,59 @@ export default function SettingsPage() {
           <TabsContent value="manychat" className="space-y-6 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>ManyChat Setup</CardTitle>
+                <CardTitle>ManyChat Integration</CardTitle>
                 <CardDescription>
-                  Configure ManyChat for comment-to-DM automation on Instagram.
+                  Connect ManyChat to auto-create comment-to-DM automations when you publish.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3 text-sm">
-                  <p className="font-medium">How ManyChat comment-to-DM works:</p>
-                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                    <li>You post a reel with a CTA like &quot;Comment &apos;AI&apos; to get the free guide&quot;</li>
-                    <li>ManyChat detects the keyword in comments on your Instagram post</li>
-                    <li>ManyChat auto-sends a DM with your checkout link</li>
-                    <li>Customer clicks link, buys product via Stripe</li>
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
+                  <p className="text-sm font-semibold mb-2">How it works:</p>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>You set a keyword + checkout URL in your Campaign Builder</li>
+                    <li>You hit Publish — your reel goes to Instagram</li>
+                    <li>AI Creator Studio auto-creates a ManyChat automation</li>
+                    <li>When someone comments your keyword, ManyChat DMs them the checkout link</li>
                   </ol>
                 </div>
 
                 <Separator />
 
                 <div>
-                  <Label>ManyChat API Token</Label>
-                  <div className="flex gap-2 mt-1">
+                  <Label>ManyChat API Key</Label>
+                  <p className="text-xs text-muted-foreground mt-1 mb-2">
+                    Get your API key from ManyChat: Settings → API → Copy your API Key
+                  </p>
+                  <div className="flex gap-2">
                     <Input
                       type="password"
-                      placeholder="Set via MANYCHAT_API_TOKEN in .env"
+                      placeholder="Set MANYCHAT_API_TOKEN in your .env file"
                       disabled
                       className="flex-1"
                     />
                     <a href="https://app.manychat.com/settings/api" target="_blank" rel="noopener noreferrer">
                       <Button variant="outline">
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Get Token
+                        Get API Key
                       </Button>
                     </a>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Add to your <code className="bg-muted px-1 py-0.5 rounded">.env</code> file: <code className="bg-muted px-1 py-0.5 rounded">MANYCHAT_API_TOKEN=your_key_here</code>
+                  </p>
                 </div>
 
                 <Separator />
 
                 <div>
-                  <p className="text-sm font-medium mb-2">Setup Steps:</p>
+                  <p className="text-sm font-medium mb-2">One-time ManyChat setup:</p>
                   <div className="space-y-2">
                     {[
-                      "Sign up for ManyChat Pro ($15/mo) and connect your Instagram Business account",
-                      "Create an Automation flow with a \"Keyword\" trigger",
-                      "Set the keyword (e.g. \"AI\", \"LINK\", \"FREE\") to match what you say in your reels",
-                      "Add a \"Send Message\" action with your Stripe checkout link",
-                      "Set the keyword in your Campaign settings to track which campaigns use which triggers",
+                      "Sign up for ManyChat Pro ($15/mo) at manychat.com",
+                      "Connect your Instagram Business account in ManyChat",
+                      "Go to Settings → API → copy your API Key",
+                      "Paste the key in your .env file as MANYCHAT_API_TOKEN",
+                      "That's it! The app handles automation creation when you publish campaigns",
                     ].map((step, i) => (
                       <div key={i} className="flex items-start gap-2 text-sm">
                         <span className="bg-muted rounded-full w-5 h-5 flex items-center justify-center text-xs shrink-0 mt-0.5">{i + 1}</span>

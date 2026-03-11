@@ -102,6 +102,7 @@ export default function CampaignBuilderPage({
   const [productName, setProductName] = useState("");
   const [productPrice, setProductPrice] = useState("");
   const [creatingProduct, setCreatingProduct] = useState(false);
+  const [productUrl, setProductUrl] = useState("");
 
   // Automation section
   const [keyword, setKeyword] = useState("");
@@ -141,7 +142,7 @@ export default function CampaignBuilderPage({
   // Checklist items
   const hasVideo = latestContent?.videoUrl || latestContent?.status === "VIDEO_UPLOADED";
   const hasCaption = !!latestContent?.caption;
-  const hasProduct = !!product;
+  const hasProduct = !!product || !!campaign.checkoutUrl || !!campaign.productUrl;
   const hasPlatform = campaign.platforms.length > 0;
   const hasKeyword = !!campaign.manychatKeyword;
 
@@ -494,102 +495,151 @@ export default function CampaignBuilderPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {product ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-lg border p-3">
-                  <div>
-                    <p className="font-medium">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      ${(product.price / 100).toFixed(2)} &middot;{" "}
-                      {product._count.orders} orders
-                    </p>
-                  </div>
+            {/* Product URL — any checkout link (Whop, Stripe, landing page) */}
+            <div className="space-y-3">
+              <div>
+                <Label>Product / Checkout URL</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  This is the link ManyChat will DM to people who comment your keyword. Use your Whop link, Stripe link, landing page — whatever you want.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://whop.com/your-product or any checkout URL"
+                    defaultValue={campaign.checkoutUrl || campaign.productUrl || ""}
+                    onChange={(e) => setProductUrl(e.target.value)}
+                  />
+                  {productUrl && (
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await updateCampaign.mutateAsync({
+                            checkoutUrl: productUrl,
+                            productUrl: productUrl,
+                          });
+                          toast.success("Product URL saved");
+                          refetch();
+                        } catch {
+                          toast.error("Failed to save URL");
+                        }
+                      }}
+                    >
+                      Save
+                    </Button>
+                  )}
                 </div>
-                {product.checkoutUrl && (
-                  <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3">
+                {(campaign.checkoutUrl || campaign.productUrl) && (
+                  <div className="flex items-center gap-2 mt-2 rounded-lg bg-green-50 border border-green-200 p-2">
                     <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-green-700 font-medium mb-1">
-                        Payment Link
-                      </p>
-                      <p className="text-xs text-green-600 truncate">
-                        {product.checkoutUrl}
-                      </p>
-                    </div>
+                    <p className="text-xs text-green-600 truncate flex-1">
+                      {campaign.checkoutUrl || campaign.productUrl}
+                    </p>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyToClipboard(product.checkoutUrl!)}
+                      onClick={() =>
+                        copyToClipboard(
+                          (campaign.checkoutUrl || campaign.productUrl)!
+                        )
+                      }
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
-                    <a
-                      href={product.checkoutUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button variant="ghost" size="sm">
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </a>
                   </div>
                 )}
               </div>
-            ) : !showProduct ? (
-              <Button
-                variant="outline"
-                onClick={() => setShowProduct(true)}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add a product to monetize this campaign
-              </Button>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label>Product Name</Label>
-                  <Input
-                    placeholder="e.g. AI Creator Blueprint"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Price (USD)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="29.99"
-                    value={productPrice}
-                    onChange={(e) => setProductPrice(e.target.value)}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleCreateProduct}
-                    disabled={creatingProduct}
-                  >
-                    {creatingProduct ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Create Product"
+
+              <Separator />
+
+              {/* Optional: Create Stripe product for built-in payment processing */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Or create a Stripe product (auto-generates a payment link):
+                </p>
+                {product ? (
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          ${(product.price / 100).toFixed(2)} &middot;{" "}
+                          {product._count.orders} orders
+                        </p>
+                      </div>
+                    </div>
+                    {product.checkoutUrl && (
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground truncate flex-1">
+                          Stripe link: {product.checkoutUrl}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(product.checkoutUrl!)}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
                     )}
-                  </Button>
+                  </div>
+                ) : !showProduct ? (
                   <Button
                     variant="outline"
-                    onClick={() => setShowProduct(false)}
+                    size="sm"
+                    onClick={() => setShowProduct(true)}
                   >
-                    Cancel
+                    <Plus className="h-3 w-3 mr-1" />
+                    Create Stripe Product
                   </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Creates a Stripe product with a reusable Payment Link
-                </p>
+                ) : (
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Product Name</Label>
+                        <Input
+                          placeholder="e.g. AI Creator Blueprint"
+                          value={productName}
+                          onChange={(e) => setProductName(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Price (USD)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="97.00"
+                          value={productPrice}
+                          onChange={(e) => setProductPrice(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleCreateProduct}
+                        disabled={creatingProduct}
+                      >
+                        {creatingProduct ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowProduct(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 
@@ -668,9 +718,11 @@ export default function CampaignBuilderPage({
               <CheckItem
                 done={hasProduct}
                 label={
-                  hasProduct
-                    ? `Product: ${product!.name} ($${(product!.price / 100).toFixed(2)})`
-                    : "Product created (optional)"
+                  campaign.checkoutUrl || campaign.productUrl
+                    ? `Checkout URL set`
+                    : product
+                      ? `Product: ${product.name} ($${(product.price / 100).toFixed(2)})`
+                      : "Checkout URL or product (optional)"
                 }
                 optional
               />

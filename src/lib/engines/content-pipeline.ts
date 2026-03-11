@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { PipelineStatus } from "@/generated/prisma/client";
 import * as lateSocial from "@/lib/services/late-social";
 import * as instagram from "@/lib/services/instagram";
+import * as manychat from "@/lib/services/manychat";
 
 // ============================================================
 // Pipeline: Upload Video -> Publish (Instagram/TikTok/YouTube)
@@ -103,6 +104,29 @@ export async function publishContent(
       postIds: JSON.parse(JSON.stringify(postIds)),
     },
   });
+
+  // Auto-create ManyChat keyword automation if campaign has keyword + checkout URL
+  if (piece.campaignId && manychat.isConfigured()) {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: piece.campaignId },
+      include: { products: { take: 1 } },
+    });
+
+    if (campaign?.manychatKeyword) {
+      const checkoutUrl =
+        campaign.checkoutUrl ||
+        campaign.productUrl ||
+        campaign.products[0]?.checkoutUrl;
+
+      if (checkoutUrl) {
+        const mcResult = await manychat.createKeywordAutomation({
+          keyword: campaign.manychatKeyword,
+          checkoutUrl,
+        });
+        postIds.manychat = mcResult;
+      }
+    }
+  }
 
   return postIds;
 }
