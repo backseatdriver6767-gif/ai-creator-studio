@@ -1,376 +1,333 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sparkles,
-  Zap,
-  TrendingUp,
-  Upload,
-  DollarSign,
-  BarChart3,
   CheckCircle2,
   ArrowRight,
-  Instagram,
-  Youtube,
-  Megaphone,
-  Shield,
+  ExternalLink,
+  Copy,
   Rocket,
-  Star,
+  Key,
+  Database,
+  Instagram,
+  MessageSquare,
+  DollarSign,
+  Megaphone,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+const DEPLOY_URL =
+  "https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fbackseatdriver6767-gif%2Fai-creator-studio&env=DATABASE_URL,POSTGRES_PRISMA_URL&envDescription=Set%20up%20your%20database%20and%20API%20keys&envLink=https%3A%2F%2Fgithub.com%2Fbackseatdriver6767-gif%2Fai-creator-studio%23environment-variables&project-name=ai-creator-studio&repository-name=ai-creator-studio";
 
 export default function LandingPage() {
-  const heygenLink = process.env.NEXT_PUBLIC_HEYGEN_AFFILIATE_LINK || "https://app.heygen.com";
+  const heygenLink =
+    process.env.NEXT_PUBLIC_HEYGEN_AFFILIATE_LINK || "https://app.heygen.com";
 
-  const features = [
-    {
-      icon: Upload,
-      title: "Upload & Publish",
-      description: "Create videos in HeyGen, download the MP4, upload here. We handle the rest — Instagram, TikTok, YouTube.",
-    },
-    {
-      icon: Megaphone,
-      title: "Multi-Platform Publishing",
-      description: "Post to Instagram, TikTok, and YouTube automatically. One dashboard, every platform.",
-    },
-    {
-      icon: DollarSign,
-      title: "Built-in Monetization",
-      description: "Stripe integration for payments, ManyChat for comment-to-DM automation. Start selling instantly.",
-    },
-    {
-      icon: BarChart3,
-      title: "Analytics & Tracking",
-      description: "Track performance, orders, and revenue in real-time. Data-driven content decisions.",
-    },
-    {
-      icon: Sparkles,
-      title: "Powered by HeyGen",
-      description: "Create stunning AI avatar videos with HeyGen. Realistic avatars, natural voices, professional quality.",
-    },
-    {
-      icon: Shield,
-      title: "Production Ready",
-      description: "Built with Next.js 16, TypeScript, Prisma 7, and Tailwind. Deploy to Vercel in 1 click.",
-    },
-  ];
+  const copyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied!");
+  };
 
   const steps = [
     {
       number: "1",
-      title: "Deploy in 1 Click",
-      description: "Click the Vercel button, set your environment variables, and you're live in 2 minutes.",
+      icon: Rocket,
+      title: "Deploy to Vercel",
+      description:
+        "Click the button below. Vercel will clone the app and deploy it to your own URL. Takes ~2 minutes.",
+      action: (
+        <a href={DEPLOY_URL} target="_blank" rel="noopener noreferrer">
+          <Button className="bg-black text-white hover:bg-gray-800 mt-3">
+            <svg className="h-4 w-4 mr-2" viewBox="0 0 76 65" fill="currentColor">
+              <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+            </svg>
+            Deploy to Vercel
+          </Button>
+        </a>
+      ),
     },
     {
       number: "2",
-      title: "Connect Your Accounts",
-      description: "Link your Instagram, set up Stripe for payments, and configure ManyChat for DM automation.",
+      icon: Database,
+      title: "Set Up Your Database",
+      description:
+        "You need a PostgreSQL database. We recommend Neon (free tier) or Supabase.",
+      action: (
+        <div className="flex gap-2 mt-3">
+          <a
+            href="https://neon.tech"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="outline" size="sm">
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Neon (Free)
+            </Button>
+          </a>
+          <a
+            href="https://supabase.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button variant="outline" size="sm">
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Supabase
+            </Button>
+          </a>
+        </div>
+      ),
     },
     {
       number: "3",
-      title: "Upload & Profit",
-      description: "Create videos in HeyGen, upload them here, publish everywhere, and start making money.",
+      icon: Instagram,
+      title: "Connect Instagram",
+      description:
+        "Go to Settings > Social Accounts in your app and connect your Instagram Business account. You need a Meta Developer App for this.",
+      action: (
+        <a
+          href="https://developers.facebook.com/apps/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Button variant="outline" size="sm" className="mt-3">
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Meta Developer Portal
+          </Button>
+        </a>
+      ),
     },
+    {
+      number: "4",
+      icon: DollarSign,
+      title: "Set Up Stripe",
+      description:
+        "Create a Stripe account and add your API keys to your Vercel environment variables. This lets you create products and accept payments.",
+      action: (
+        <a
+          href="https://dashboard.stripe.com/apikeys"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Button variant="outline" size="sm" className="mt-3">
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Stripe Dashboard
+          </Button>
+        </a>
+      ),
+    },
+    {
+      number: "5",
+      icon: MessageSquare,
+      title: "Set Up ManyChat",
+      description:
+        "Get ManyChat Pro ($15/mo), connect your Instagram, and add your API key. When you publish a campaign, the app auto-creates the keyword automation.",
+      action: (
+        <a
+          href="https://manychat.com"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Button variant="outline" size="sm" className="mt-3">
+            <ExternalLink className="h-3 w-3 mr-1" />
+            ManyChat
+          </Button>
+        </a>
+      ),
+    },
+    {
+      number: "6",
+      icon: Sparkles,
+      title: "Create Videos in HeyGen",
+      description:
+        "Sign up for HeyGen, create your AI avatar, make your first video, download the MP4, and upload it in your Campaign Builder.",
+      action: (
+        <a href={heygenLink} target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" size="sm" className="mt-3">
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Open HeyGen
+          </Button>
+        </a>
+      ),
+    },
+  ];
+
+  const envVars = [
+    { key: "DATABASE_URL", desc: "PostgreSQL connection string", required: true },
+    { key: "POSTGRES_PRISMA_URL", desc: "Same as DATABASE_URL", required: true },
+    { key: "META_APP_ID", desc: "Meta/Facebook App ID", required: false },
+    { key: "META_APP_SECRET", desc: "Meta/Facebook App Secret", required: false },
+    { key: "STRIPE_SECRET_KEY", desc: "Stripe Secret Key (sk_live_...)", required: false },
+    { key: "STRIPE_WEBHOOK_SECRET", desc: "Stripe Webhook Secret (whsec_...)", required: false },
+    { key: "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", desc: "Stripe Publishable Key (pk_live_...)", required: false },
+    { key: "MANYCHAT_API_TOKEN", desc: "ManyChat API Key", required: false },
+    { key: "NEXT_PUBLIC_APP_URL", desc: "Your deployed app URL", required: false },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 px-6">
-        <div className="max-w-6xl mx-auto">
+      {/* Hero */}
+      <section className="relative overflow-hidden py-16 px-6">
+        <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-center space-y-8"
+            className="text-center space-y-6"
           >
-            <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium">
-              <Sparkles className="h-4 w-4" />
-              <span>Create AI Videos in HeyGen. Automate Everything Else.</span>
+            <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>Purchase Complete — Let&apos;s Get You Set Up</span>
             </div>
 
-            <h1 className="text-6xl md:text-7xl font-bold tracking-tight">
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
               <span className="bg-gradient-to-r from-purple-600 via-blue-600 to-purple-600 bg-clip-text text-transparent">
                 AI Creator Studio
               </span>
             </h1>
 
-            <p className="text-2xl md:text-3xl text-muted-foreground max-w-3xl mx-auto font-medium">
-              Upload videos. Auto-post everywhere. Make money.
-              <br />
-              <span className="text-foreground font-bold">All in one platform.</span>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Follow these steps to deploy your own AI Creator Studio and start making money with AI content.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <a
-                href="https://whop.com/your-product-id/"
-                target="_blank"
-                rel="noopener noreferrer"
+            <a href={DEPLOY_URL} target="_blank" rel="noopener noreferrer">
+              <Button
+                size="lg"
+                className="bg-black text-white hover:bg-gray-800 text-lg px-8 py-6 shadow-lg mt-4"
               >
-                <Button size="lg" className="gradient-purple-blue text-white text-lg px-8 py-6 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all">
-                  <Rocket className="mr-2 h-5 w-5" />
-                  Get Access Now - $97
-                </Button>
-              </a>
-              <Link href="/">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6">
-                  View Live Demo
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-            </div>
-
-            <div className="flex flex-wrap gap-4 justify-center items-center text-sm text-muted-foreground pt-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>One-time payment</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>Instant repo access</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>Deploy to your Vercel</span>
-              </div>
-            </div>
+                <svg className="h-5 w-5 mr-2" viewBox="0 0 76 65" fill="currentColor">
+                  <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
+                </svg>
+                Deploy to Vercel — Free
+              </Button>
+            </a>
           </motion.div>
         </div>
-
-        {/* Decorative gradient blobs */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000" />
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000" />
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 px-6 bg-white/50 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto space-y-12">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl md:text-5xl font-bold">Everything You Need to Win</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Upload your HeyGen videos, publish everywhere, and monetize with built-in payments and automation.
-            </p>
-          </div>
+      {/* Steps */}
+      <section className="py-12 px-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <h2 className="text-3xl font-bold text-center mb-8">
+            Setup Guide
+          </h2>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature, idx) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                viewport={{ once: true }}
-              >
-                <Card className="h-full hover:shadow-lg transition-shadow border-2 hover:border-purple-200">
-                  <CardHeader>
-                    <div className="h-12 w-12 rounded-lg gradient-purple-blue flex items-center justify-center mb-4">
-                      <feature.icon className="h-6 w-6 text-white" />
+          {steps.map((step, idx) => (
+            <motion.div
+              key={step.number}
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              viewport={{ once: true }}
+            >
+              <Card className="border-2 hover:border-purple-200 transition-colors">
+                <CardContent className="pt-6">
+                  <div className="flex gap-5 items-start">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center shrink-0">
+                      <span className="text-lg font-bold text-white">
+                        {step.number}
+                      </span>
                     </div>
-                    <CardTitle className="text-xl">{feature.title}</CardTitle>
-                    <CardDescription className="text-base">{feature.description}</CardDescription>
-                  </CardHeader>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                        <step.icon className="h-4 w-4 text-purple-600" />
+                        {step.title}
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        {step.description}
+                      </p>
+                      {step.action}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       </section>
 
-      {/* HeyGen Section */}
-      <section className="py-20 px-6 bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="max-w-4xl mx-auto space-y-8">
-          <div className="text-center space-y-6">
-            <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 text-lg px-6 py-2">
-              Powered by HeyGen
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold">
-              Create AI Videos in HeyGen
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Use HeyGen&apos;s studio to create stunning AI avatar videos, then upload them here to publish and monetize.
-            </p>
-          </div>
-
-          <Card className="border-2 border-purple-200">
-            <CardContent className="pt-6 space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Realistic AI Avatars</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Natural Voice Synthesis</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Custom Avatar Creation</span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Fast Video Generation</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Multiple Languages</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <span className="font-semibold">Pay-as-you-go Credits</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
-                <p className="text-sm text-center mb-4 font-medium">
-                  <Star className="h-4 w-4 inline mr-1 text-purple-600" />
-                  New to HeyGen? Create your account and start making videos
-                </p>
-                <div className="flex justify-center">
-                  <a
-                    href={heygenLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
+      {/* Environment Variables Reference */}
+      <section className="py-12 px-6 bg-white/50">
+        <div className="max-w-3xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                Environment Variables Reference
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add these in Vercel: Project Settings → Environment Variables. Only DATABASE_URL is required to start.
+              </p>
+              <div className="space-y-2">
+                {envVars.map((v) => (
+                  <div
+                    key={v.key}
+                    className="flex items-center justify-between rounded-lg border p-2 text-sm"
                   >
-                    <Button className="gradient-purple-blue text-white">
-                      Create Your HeyGen Account
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </a>
-                </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <code className="bg-muted px-2 py-0.5 rounded text-xs shrink-0">
+                        {v.key}
+                      </code>
+                      <span className="text-muted-foreground text-xs truncate">
+                        {v.desc}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {v.required && (
+                        <span className="text-xs text-red-600 font-medium">
+                          Required
+                        </span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyText(v.key)}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 px-6 bg-gradient-to-br from-purple-50 to-blue-50">
-        <div className="max-w-4xl mx-auto space-y-12">
-          <div className="text-center space-y-4">
-            <h2 className="text-4xl md:text-5xl font-bold">Get Started in 3 Steps</h2>
-            <p className="text-xl text-muted-foreground">
-              From zero to making money in under 10 minutes.
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            {steps.map((step, idx) => (
-              <motion.div
-                key={step.number}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.2 }}
-                viewport={{ once: true }}
-              >
-                <Card className="border-2">
-                  <CardContent className="pt-6">
-                    <div className="flex gap-6 items-start">
-                      <div className="h-12 w-12 rounded-full gradient-purple-blue flex items-center justify-center shrink-0">
-                        <span className="text-2xl font-bold text-white">{step.number}</span>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-2xl font-bold mb-2">{step.title}</h3>
-                        <p className="text-muted-foreground text-lg">{step.description}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Social Proof Section */}
-      <section className="py-20 px-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8 text-center">
-            <div className="space-y-2">
-              <div className="flex items-center justify-center gap-2">
-                <Instagram className="h-6 w-6 text-purple-600" />
-                <Youtube className="h-6 w-6 text-red-600" />
-                <Megaphone className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="text-4xl font-bold">3+</div>
-              <div className="text-muted-foreground">Social Platforms</div>
-            </div>
-            <div className="space-y-2">
-              <TrendingUp className="h-6 w-6 text-green-600 mx-auto" />
-              <div className="text-4xl font-bold">100%</div>
-              <div className="text-muted-foreground">Automated Posting</div>
-            </div>
-            <div className="space-y-2">
-              <Zap className="h-6 w-6 text-yellow-600 mx-auto" />
-              <div className="text-4xl font-bold">2 min</div>
-              <div className="text-muted-foreground">Deploy Time</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          <h2 className="text-4xl md:text-5xl font-bold">
-            Ready to Build Your Content Empire?
-          </h2>
-          <p className="text-xl opacity-90">
-            Join creators making money with AI-generated content. Get instant access and deploy in 2 minutes.
+      {/* Final CTA */}
+      <section className="py-16 px-6">
+        <div className="max-w-2xl mx-auto text-center space-y-6">
+          <Megaphone className="h-12 w-12 text-purple-600 mx-auto" />
+          <h2 className="text-3xl font-bold">You&apos;re Ready</h2>
+          <p className="text-muted-foreground">
+            Once deployed, open your app and the onboarding wizard will walk you through connecting everything. Create your first campaign, upload a HeyGen video, and hit Publish.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="https://whop.com/your-product-id/"
-              target="_blank"
-              rel="noopener noreferrer"
+          <a href={DEPLOY_URL} target="_blank" rel="noopener noreferrer">
+            <Button
+              size="lg"
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-lg px-8 py-6"
             >
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-6 bg-white text-purple-600 hover:bg-gray-100">
-                <Rocket className="mr-2 h-5 w-5" />
-                Get Access Now - $97
-              </Button>
-            </a>
-            <Link href="/">
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-white hover:bg-white/10">
-                View Live Demo
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
+              <Rocket className="mr-2 h-5 w-5" />
+              Deploy Now
+            </Button>
+          </a>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 bg-slate-900 text-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg gradient-purple-blue flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <div className="font-bold">AI Creator Studio</div>
-                <div className="text-sm text-gray-400">Create. Profit. Repeat.</div>
-              </div>
+      <footer className="py-8 px-6 bg-slate-900 text-white">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <div className="flex gap-6 text-sm text-gray-400">
-              <Link href="/" className="hover:text-white transition-colors">
-                Demo
-              </Link>
-              <a href="https://whop.com/your-product-id/" className="hover:text-white transition-colors">
-                Purchase
-              </a>
-              <a href="mailto:support@yourdomain.com" className="hover:text-white transition-colors">
-                Support
-              </a>
-            </div>
+            <span className="font-bold">AI Creator Studio</span>
           </div>
+          <p className="text-sm text-gray-400">Create. Profit. Repeat.</p>
         </div>
       </footer>
     </div>
