@@ -39,6 +39,7 @@
 // PAPER TRADING ONLY. No live order routing anywhere in this CLI.
 
 import { fetchDailyBars, splitBars } from "./data/yahoo.mjs";
+import { fetchBars as fetchBarsMulti } from "./data/multiSource.mjs";
 import { runBacktest } from "./engine/backtest.mjs";
 import { walkForward } from "./engine/walkForward.mjs";
 import { bootstrapTradeSeries } from "./engine/monteCarlo.mjs";
@@ -68,6 +69,13 @@ import { asciiChart } from "./report/asciiChart.mjs";
 import { logManualTrade, roundTripTrades } from "./journal/manualLog.mjs";
 import { edgeReport } from "./journal/edgeReport.mjs";
 import { openShadow, evaluateBook, shadowReport, readBook } from "./shadow/shadowBook.mjs";
+import { shadowBlotter } from "./shadow/blotter.mjs";
+import { cointegrationTest } from "./engine/cointegration.mjs";
+import { hurstExponent, classifyHurst } from "./engine/hurst.mjs";
+import { riskReport } from "./risk/varCvar.mjs";
+import { rollingSharpe, underwaterCurve, monthlyReturnGrid, renderMonthlyGrid } from "./report/rollingMetrics.mjs";
+import { evaluateKillSwitch } from "./decision/killSwitch.mjs";
+import { loadAllFills, filterFills, roundTrips, edgeSummary } from "./journal/query.mjs";
 import { logPlan, markPlan, adherenceStats, readAllPlans } from "./decision/tradePlan.mjs";
 import { preTradeChecklist } from "./decision/preTradeChecklist.mjs";
 import { notify } from "./notify/index.mjs";
@@ -445,6 +453,133 @@ async function cmdRuns() {
   for (const r of runs) console.log(`${r.ts}  ${r.kind}  ${r.symbol || ""}  runId=${r.runId}`);
 }
 
+// ---------- New analytics commands ----------
+//
+// These commands intentionally go through multiSource.fetchBars rather
+// than fetchDailyBars so they benefit from the Yahoo-v8 failover that
+// the older commands don't have yet. Shape returned is { bars, source }.
+
+async function loadBarsMulti(symbol, from, to) {
+  const { bars } = await fetchBarsMulti(symbol, from, to);
+  return bars;
+}
+
+async function cmdCointegration(args) {
+  const symA = args["symbol-a"] || "EWA";
+  const symB = args["symbol-b"] || "EWC";
+  const from = args.from || "2015-01-01";
+  const to = args.to || new Date().toISOString().slice(0, 10);
+  const a = await loadBarsMulti(symA, from, to);
+  const b = await loadBarsMulti(symB, from, to);
+  const n = Math.min(a.length, b.length);
+  // Align on intersection of dates so we don't compare different days.
+  const bMap = new Map(b.map((x) => [x.date, x.close]));
+  const aC = [], bC = [];
+  for (const row of a.slice(-n)) {
+    if (bMap.has(row.date)) { aC.push(row.close); bC.push(bMap.get(row.date)); }
+  }
+  const r = cointegrationTest(aC, bC);
+  console.log(JSON.stringify({ symA, symB, aligned: aC.length, ...r }, null, 2));
+}
+
+async function cmdHurst(args) {
+  const symbol = args.symbol || "SPY";
+  const bars = await loadBarsMulti(symbol, args.from || "2015-01-01", args.to || new Date().toISOString().slice(0, 10));
+  const h = hurstExponent(bars.map((b) => b.close));
+  console.log(JSON.stringify({ symbol, n: bars.length, hurst: h, regime: classifyHurst(h) }, null, 2));
+}
+
+async function cmdVarReport(args) {
+  const symbol = args.symbol || "SPY";
+  const bars = await loadBarsMulti(symbol, args.from || "2015-01-01", args.to || new Date().toISOString().slice(0, 10));
+  const rets = [];
+  for (let i = 1; i < bars.length; i++) {
+    rets.push((bars[i].close - bars[i - 1].close) / bars[i - 1].close);
+  }
+  const confidence = Number(args.confidence || 0.95);
+  const horizonDays = Number(args.horizon || 1);
+  const r = riskReport(rets, { confidence, horizonDays });
+  console.log(JSON.stringify({ symbol, ...r }, null, 2));
+}
+
+async function cmdRolling(args) {
+  const symbol = args.symbol || "SPY";
+  const bars = await loadBarsMulti(symbol, args.from || "2015-01-01", args.to || new Date().toISOString().slice(0, 10));
+  const strat = buyAndHold();
+  const res = runBacktest(bars, strat);
+  const sharpe = rollingSharpe(res.equityCurve, { window: Number(args.window || 63) });
+  const uw = underwaterCurve(res.equityCurve);
+  const tail = 10;
+  console.log(`Rolling ${args.window || 63}-day Sharpe (last ${tail}):`);
+  console.table(sharpe.slice(-tail));
+  console.log(`\nUnderwater curve (last ${tail}):`);
+  console.table(uw.slice(-tail));
+}
+
+async function cmdMonthlyGrid(args) {
+  const symbol = args.symbol || "SPY";
+  const bars = await loadBarsMulti(symbol, args.from || "2015-01-01", args.to || new Date().toISOString().slice(0, 10));
+  const res = runBacktest(bars, buyAndHold());
+  const grid = monthlyReturnGrid(res.equityCurve);
+  console.log(renderMonthlyGrid(grid, `${symbol} monthly returns %`));
+}
+
+function cmdKillSwitch(args) {
+  const snap = {
+    sessionStartEquity: Number(args["session-start"]),
+    currentEquity: Number(args.equity),
+    peakEquity: Number(args.peak || args.equity),
+    consecutiveLosses: Number(args["cons-losses"] || 0),
+    tradesToday: Number(args["trades-today"] || 0),
+    openHeatPct: Number(args["heat"] || 0),
+    cooldownUntilISO: args["cooldown-until"] || null,
+    todayISO: args.today || new Date().toISOString().slice(0, 10),
+  };
+  const r = evaluateKillSwitch(snap);
+  console.log(JSON.stringify(r, null, 2));
+  if (!r.ok) process.exitCode = 2;
+}
+
+async function cmdBlotter() {
+  const r = await shadowBlotter();
+  if (!r.rows?.length) { console.log("No open shadow positions."); return; }
+  console.table(r.rows);
+  console.log(`\nOpen: ${r.open}  Unrealized P&L: $${r.totalUnrealized}  Risk on book: $${r.totalRiskOnBook}`);
+}
+
+async function cmdTrades(args) {
+  const fills = await loadAllFills();
+  const filtered = filterFills(fills, {
+    symbol: args.symbol,
+    strategy: args.strategy,
+    runId: args["run-id"],
+    side: args.side,
+    from: args.from,
+    to: args.to,
+    limit: args.limit ? Number(args.limit) : undefined,
+  });
+  if (args.mode === "fills") {
+    console.table(filtered.map((f) => ({
+      date: f.date ?? f.ts?.slice(0, 10),
+      symbol: f.symbol, strategy: f.strategy, side: f.side,
+      qty: f.qty, price: f.price,
+    })));
+    console.log(`${filtered.length} fills.`);
+    return;
+  }
+  const trips = roundTrips(filtered);
+  if (args.mode === "trips") {
+    console.table(trips);
+    console.log(`${trips.length} round-trip trades.`);
+    return;
+  }
+  // Default: edge summary, grouped by whatever the caller asked for.
+  const groupBy = args["group-by"] || "strategy";
+  const summary = edgeSummary(trips, groupBy);
+  console.log(`Edge summary (grouped by ${groupBy}):`);
+  console.table(summary);
+}
+
 async function readStdin() {
   let data = "";
   process.stdin.setEncoding("utf8");
@@ -461,9 +596,11 @@ Commands:
   news | filings | calendar | digest
   red-team | coach | scout
   log | edge
-  shadow-open | shadow-evaluate | shadow-report | shadow-list
+  shadow-open | shadow-evaluate | shadow-report | shadow-list | blotter
   plan | plan-mark | adherence | check
   notify
+  cointegration | hurst | var-report | rolling | monthly-grid | kill-switch
+  trades
   curriculum | runs
 
 Run with --help on any subcommand name for usage stubs; see src/cli.mjs source for the full list.`;
@@ -483,9 +620,17 @@ async function main() {
     "shadow-evaluate": cmdShadowEvaluate,
     "shadow-report": cmdShadowReport,
     "shadow-list": cmdShadowList,
+    blotter: cmdBlotter,
     plan: cmdPlan, "plan-mark": cmdPlanMark, adherence: cmdAdherence,
     check: cmdCheck,
     notify: cmdNotify,
+    cointegration: cmdCointegration,
+    hurst: cmdHurst,
+    "var-report": cmdVarReport,
+    rolling: cmdRolling,
+    "monthly-grid": cmdMonthlyGrid,
+    "kill-switch": cmdKillSwitch,
+    trades: cmdTrades,
     curriculum: cmdCurriculum, runs: cmdRuns,
   };
   const fn = table[cmd];

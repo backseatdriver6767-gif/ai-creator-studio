@@ -2,15 +2,31 @@
 // returns a usable series wins. Cached results are keyed by (symbol, range)
 // not by provider so a successful provider fill is reused automatically.
 //
-// Order: Stooq (most reliable for daily) → Yahoo CSV → Yahoo v8 chart.
+// Order (2026-current): Yahoo v8 chart (the live endpoint the website
+// itself uses) → Stooq (if it ever returns CSV again) → legacy Yahoo CSV
+// (v7 /finance/download — currently 401s but kept as final fallback in
+// case it ever comes back).
 
+import { fetchYahooV8Daily } from "./yahooV8Daily.mjs";
 import { fetchStooqDaily } from "./stooq.mjs";
 import { fetchDailyBars as fetchYahooCsv } from "./yahoo.mjs";
 import { checkIntegrity } from "./integrity.mjs";
 
+// As of 2026 the legacy providers (Stooq CSV for US tickers, Yahoo v7
+// /finance/download CSV) both return landing pages / 401s and are kept
+// only behind an opt-in env flag so a fresh run does not waste time on
+// them. The v8 chart endpoint is the one the Yahoo website itself calls
+// and remains free and unauthenticated.
+const INCLUDE_LEGACY = process.env.PAPER_TRADING_INCLUDE_LEGACY_PROVIDERS === "1";
+
 const PROVIDERS = [
-  { name: "stooq", fn: fetchStooqDaily },
-  { name: "yahoo-csv", fn: fetchYahooCsv },
+  { name: "yahoo-v8", fn: fetchYahooV8Daily },
+  ...(INCLUDE_LEGACY
+    ? [
+        { name: "stooq", fn: fetchStooqDaily },
+        { name: "yahoo-csv", fn: fetchYahooCsv },
+      ]
+    : []),
 ];
 
 export async function fetchBars(symbol, fromISO, toISO, { strict = true } = {}) {

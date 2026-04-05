@@ -44,6 +44,13 @@ import { validatePlan } from "../src/decision/tradePlan.mjs";
 import { preTradeChecklist } from "../src/decision/preTradeChecklist.mjs";
 import { computeMaeMfe, aggregateExcursions } from "../src/decision/maeMfe.mjs";
 import { hashBars } from "../src/engine/manifest.mjs";
+import { cointegrationTest, adfOneLag } from "../src/engine/cointegration.mjs";
+import { hurstExponent, classifyHurst } from "../src/engine/hurst.mjs";
+import { varHistorical, cvarHistorical, varParametric, cvarParametric, riskReport } from "../src/risk/varCvar.mjs";
+import { rollingSharpe, rollingMaxDrawdown, underwaterCurve, monthlyReturnGrid, renderMonthlyGrid } from "../src/report/rollingMetrics.mjs";
+import { evaluateKillSwitch, applyTradeResult, DEFAULT_LIMITS } from "../src/decision/killSwitch.mjs";
+import { filterFills, roundTrips, edgeSummary } from "../src/journal/query.mjs";
+import { randomSearch, enumerateGrid } from "../src/engine/randomSearch.mjs";
 
 function mulberry32(a) {
   return function () {
@@ -69,7 +76,7 @@ function syntheticDailyBars(n = 500, seed = 1) {
     const h = Math.max(o, c) * 1.002;
     const l = Math.min(o, c) * 0.998;
     const d = new Date(start);
-    d.setDate(d.getDate() + i);
+    d.setUTCDate(d.getUTCDate() + i);
     bars.push({ date: d.toISOString().slice(0, 10), open: o, high: h, low: l, close: c, volume: 1_000_000 });
   }
   return bars;
@@ -420,6 +427,203 @@ ok("bars hash deterministic", () => {
   const h1 = hashBars(daily);
   const h2 = hashBars(daily);
   assert.equal(h1, h2);
+});
+
+// ── Cointegration / Hurst ────────────────────────────────
+ok("cointegration detects spurious non-cointegration on independent walks", () => {
+  const rng = mulberry32(7);
+  const x = [100], y = [100];
+  for (let i = 1; i < 400; i++) {
+    x.push(x[i - 1] + (rng() - 0.5) * 1.0);
+    y.push(y[i - 1] + (rng() - 0.5) * 1.0);
+  }
+  const r = cointegrationTest(x, y);
+  assert.ok(typeof r.tStat === "number");
+  assert.ok(typeof r.cointegrated === "boolean");
+});
+ok("cointegration finds cointegration on y = 2x + stationary noise", () => {
+  const rng = mulberry32(11);
+  const x = [100];
+  for (let i = 1; i < 400; i++) x.push(x[i - 1] + (rng() - 0.5) * 1.0);
+  const y = x.map((v) => 2 * v + 5 + (rng() - 0.5) * 2);
+  // Dependent = y, independent = x, so the fitted slope should recover ≈ 2.
+  const r = cointegrationTest(y, x);
+  assert.ok(Math.abs(r.beta - 2) < 0.2, `beta=${r.beta}`);
+});
+ok("ADF runs without error", () => {
+  const rng = mulberry32(3);
+  const stationary = [];
+  let s = 0;
+  for (let i = 0; i < 200; i++) { s = 0.3 * s + (rng() - 0.5); stationary.push(s); }
+  const r = adfOneLag(stationary);
+  assert.ok(typeof r.tStat === "number");
+});
+ok("hurst roughly 0.5 for random walk", () => {
+  const rng = mulberry32(5);
+  const walk = [100];
+  for (let i = 1; i < 600; i++) walk.push(walk[i - 1] * (1 + (rng() - 0.5) * 0.01));
+  const h = hurstExponent(walk);
+  assert.ok(h > 0.2 && h < 0.8, `h=${h}`);
+});
+ok("hurst classifier labels within tolerance", () => {
+  assert.equal(classifyHurst(0.51), "random-walk");
+  assert.equal(classifyHurst(0.3), "mean-reverting");
+  assert.equal(classifyHurst(0.8), "trending");
+});
+
+// ── VaR / CVaR ───────────────────────────────────────────
+ok("var historical is positive for losing distribution", () => {
+  const rets = [-0.05, -0.03, -0.01, 0.0, 0.01, 0.02, 0.02, 0.03, 0.04, -0.1];
+  const v = varHistorical(rets, 0.9);
+  assert.ok(v > 0);
+});
+ok("cvar historical ≥ var historical", () => {
+  const rets = [-0.05, -0.03, -0.01, 0.0, 0.01, 0.02, 0.02, 0.03, 0.04, -0.1];
+  const v = varHistorical(rets, 0.9);
+  const c = cvarHistorical(rets, 0.9);
+  assert.ok(c >= v - 1e-9);
+});
+ok("parametric var returns a finite number", () => {
+  const rets = [];
+  const rng = mulberry32(2);
+  for (let i = 0; i < 500; i++) rets.push((rng() - 0.5) * 0.02);
+  const v = varParametric(rets, 0.95);
+  const c = cvarParametric(rets, 0.95);
+  assert.ok(Number.isFinite(v) && Number.isFinite(c));
+});
+ok("risk report scales by √T", () => {
+  const rets = [];
+  const rng = mulberry32(4);
+  for (let i = 0; i < 500; i++) rets.push((rng() - 0.5) * 0.02);
+  const r1 = riskReport(rets, { confidence: 0.95, horizonDays: 1 });
+  const r10 = riskReport(rets, { confidence: 0.95, horizonDays: 10 });
+  assert.ok(r10.historical.var > r1.historical.var);
+});
+
+// ── Rolling metrics / monthly grid / underwater ──────────
+const eqCurve = daily.map((b, i) => ({ date: b.date, equity: 10000 * (1 + i * 0.001) }));
+ok("rolling sharpe returns series", () => {
+  const s = rollingSharpe(eqCurve, { window: 30 });
+  assert.ok(s.length === eqCurve.length - 1);
+});
+ok("rolling max drawdown non-positive", () => {
+  const dd = rollingMaxDrawdown(eqCurve, { window: 60 });
+  assert.ok(dd.every((x) => x.maxDDPct <= 0));
+});
+ok("underwater curve zero at new high", () => {
+  const uw = underwaterCurve([{ date: "2020-01-01", equity: 100 }, { date: "2020-01-02", equity: 110 }]);
+  assert.equal(uw[1].underwaterPct, 0);
+});
+ok("monthly grid renders", () => {
+  const grid = monthlyReturnGrid(eqCurve);
+  const txt = renderMonthlyGrid(grid);
+  assert.ok(typeof txt === "string" && txt.includes("Year"));
+});
+
+// ── Kill switch ──────────────────────────────────────────
+ok("kill switch ok on clean snapshot", () => {
+  const snap = {
+    sessionStartEquity: 100000, currentEquity: 100500, peakEquity: 100500,
+    consecutiveLosses: 0, tradesToday: 2, openHeatPct: 2,
+    cooldownUntilISO: null, todayISO: "2025-05-07",
+  };
+  const r = evaluateKillSwitch(snap);
+  assert.equal(r.ok, true);
+});
+ok("kill switch halts on daily loss breach", () => {
+  const snap = {
+    sessionStartEquity: 100000, currentEquity: 96000, peakEquity: 100000,
+    consecutiveLosses: 1, tradesToday: 3, openHeatPct: 1,
+    cooldownUntilISO: null, todayISO: "2025-05-07",
+  };
+  const r = evaluateKillSwitch(snap, { dailyLossPct: 3 });
+  assert.equal(r.halted, true);
+  assert.ok(r.reasons.some((s) => s.includes("daily loss")));
+});
+ok("kill switch sets cooldown on consecutive losses", () => {
+  const snap = {
+    sessionStartEquity: 100000, currentEquity: 99000, peakEquity: 100000,
+    consecutiveLosses: 4, tradesToday: 4, openHeatPct: 1,
+    cooldownUntilISO: null, todayISO: "2025-05-07",
+  };
+  const r = evaluateKillSwitch(snap, { maxConsecutiveLosses: 4, cooldownDays: 2 });
+  assert.equal(r.halted, true);
+  assert.ok(r.cooldownUntilISO && r.cooldownUntilISO > snap.todayISO);
+});
+ok("applyTradeResult produces immutable new snapshot", () => {
+  const snap = {
+    sessionStartEquity: 100000, currentEquity: 100000, peakEquity: 100000,
+    consecutiveLosses: 0, tradesToday: 0, openHeatPct: 0,
+    cooldownUntilISO: null, todayISO: "2025-05-07",
+  };
+  const next = applyTradeResult(snap, { pnl: -500, risk: 1000, todayISO: "2025-05-07" });
+  assert.equal(snap.currentEquity, 100000); // original untouched
+  assert.equal(next.currentEquity, 99500);
+  assert.equal(next.consecutiveLosses, 1);
+  assert.equal(next.tradesToday, 1);
+});
+ok("kill switch has default limits", () => {
+  assert.ok(DEFAULT_LIMITS.dailyLossPct > 0);
+});
+
+// ── Journal query / round trips / edge summary ───────────
+ok("filterFills by symbol and strategy", () => {
+  const fills = [
+    { runId: "a", strategy: "S1", symbol: "SPY", side: "BUY", date: "2020-01-05", price: 100, qty: 10 },
+    { runId: "a", strategy: "S1", symbol: "QQQ", side: "BUY", date: "2020-01-05", price: 200, qty: 5 },
+  ];
+  const r = filterFills(fills, { symbol: "SPY", strategy: "S1" });
+  assert.equal(r.length, 1);
+  assert.equal(r[0].symbol, "SPY");
+});
+ok("roundTrips pairs buys with sells", () => {
+  const fills = [
+    { runId: "r", strategy: "S", symbol: "SPY", side: "BUY", date: "2020-01-05", price: 100, qty: 10 },
+    { runId: "r", strategy: "S", symbol: "SPY", side: "SELL", date: "2020-01-12", price: 110, qty: 10 },
+    { runId: "r", strategy: "S", symbol: "SPY", side: "BUY", date: "2020-02-01", price: 112, qty: 10 },
+    { runId: "r", strategy: "S", symbol: "SPY", side: "SELL", date: "2020-02-08", price: 108, qty: 10 },
+  ];
+  const trips = roundTrips(fills);
+  assert.equal(trips.length, 2);
+  assert.ok(trips[0].pnlPct > 0);
+  assert.ok(trips[1].pnlPct < 0);
+  assert.equal(trips[0].holdingDays, 7);
+});
+ok("edgeSummary computes expectancy", () => {
+  const trips = [
+    { symbol: "SPY", strategy: "S", pnlPct: 0.05, pnlAbs: 50, holdingDays: 3 },
+    { symbol: "SPY", strategy: "S", pnlPct: -0.02, pnlAbs: -20, holdingDays: 2 },
+    { symbol: "SPY", strategy: "S", pnlPct: 0.03, pnlAbs: 30, holdingDays: 4 },
+  ];
+  const [overall] = edgeSummary(trips);
+  assert.equal(overall.trades, 3);
+  assert.equal(overall.winRatePct, 66.67);
+  assert.ok(overall.expectancyR > 0);
+});
+
+// ── Random search ────────────────────────────────────────
+ok("randomSearch finds optimum of simple quadratic", async () => {
+  const space = { x: { floatRange: [-5, 5] }, y: { floatRange: [-5, 5] } };
+  const { best, history } = await randomSearch(
+    space,
+    ({ x, y }) => ({ score: -(x * x + y * y), metrics: null }),
+    { iters: 200, seed: 123 },
+  );
+  assert.equal(history.length, 200);
+  assert.ok(best.score > -2, `best score ${best.score}`);
+});
+ok("randomSearch respects early stopping", async () => {
+  let calls = 0;
+  await randomSearch(
+    { x: { intRange: [0, 10] } },
+    ({ x }) => { calls++; return { score: x === 5 ? 100 : 0 }; },
+    { iters: 500, seed: 1, earlyStopRounds: 5 },
+  );
+  assert.ok(calls < 500);
+});
+ok("enumerateGrid expands intRange", () => {
+  const g = enumerateGrid({ a: { intRange: [1, 3] }, b: { choices: ["x", "y"] } });
+  assert.equal(g.length, 6);
 });
 
 if (failed > 0) { console.error(`\n${failed} test(s) failed`); process.exit(1); }

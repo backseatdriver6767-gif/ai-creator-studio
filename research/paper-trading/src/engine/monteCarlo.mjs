@@ -2,13 +2,32 @@
 // Resample with replacement, reconstruct equity curve, compute Sharpe + max
 // drawdown distribution. Gives you an honest confidence interval instead of
 // a single fragile point estimate.
+//
+// Annualization: trade returns are NOT daily returns. A strategy that makes
+// 38 trades in 10 years should not be annualized by √252. Pass the actual
+// span in years (or raw tradesPerYear) so the Sharpe scales correctly. If
+// neither is provided, the per-trade (unscaled) Sharpe is returned and the
+// caller is expected to know what that means.
 
-export function bootstrapTradeSeries(tradeReturns, { iters = 2000, seed = 42 } = {}) {
+export function bootstrapTradeSeries(
+  tradeReturns,
+  { iters = 2000, seed = 42, yearsSpanned = null, tradesPerYear = null } = {},
+) {
   if (!tradeReturns.length) return { samples: 0 };
   const rng = mulberry32(seed);
   const sharpes = [];
   const maxDDs = [];
   const finalRets = [];
+
+  // Compute an honest annualization factor. If we know how many years the
+  // trades spanned, convert. Otherwise accept an explicit tradesPerYear.
+  // Fall back to 1 (per-trade Sharpe, unscaled) if neither is supplied.
+  let annFactor = 1;
+  if (tradesPerYear && tradesPerYear > 0) {
+    annFactor = Math.sqrt(tradesPerYear);
+  } else if (yearsSpanned && yearsSpanned > 0) {
+    annFactor = Math.sqrt(tradeReturns.length / yearsSpanned);
+  }
 
   for (let it = 0; it < iters; it++) {
     let equity = 1;
@@ -25,7 +44,7 @@ export function bootstrapTradeSeries(tradeReturns, { iters = 2000, seed = 42 } =
     }
     const mean = rs.reduce((s, x) => s + x, 0) / rs.length;
     const sd = Math.sqrt(rs.reduce((s, x) => s + (x - mean) ** 2, 0) / (rs.length - 1));
-    sharpes.push(sd > 0 ? (mean / sd) * Math.sqrt(252) : 0);
+    sharpes.push(sd > 0 ? (mean / sd) * annFactor : 0);
     maxDDs.push(maxDD);
     finalRets.push(equity - 1);
   }

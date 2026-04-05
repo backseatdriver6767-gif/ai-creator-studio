@@ -84,12 +84,14 @@ async function runOne(symbol) {
   );
   console.log(`  mean OOS Sharpe = ${wf.oosMeanSharpe}`);
 
-  // Monte Carlo on the SMA trade returns
+  // Monte Carlo on the SMA trade returns. Annualize by the actual trade
+  // frequency observed, not by √252 (which would assume daily sampling).
   const smaRes = runBacktest(bars, smaCrossover({ fast: 10, slow: 30 }));
   const tradeReturns = extractRoundTripReturns(smaRes.fills);
   if (tradeReturns.length) {
-    const mc = bootstrapTradeSeries(tradeReturns, { iters: 1000 });
-    console.log(`\nMonte Carlo on SMA(10/30) trades (${tradeReturns.length} trades, 1000 iters):`);
+    const yearsSpanned = (new Date(bars[bars.length - 1].date) - new Date(bars[0].date)) / (365.25 * 86400_000);
+    const mc = bootstrapTradeSeries(tradeReturns, { iters: 1000, yearsSpanned });
+    console.log(`\nMonte Carlo on SMA(10/30) trades (${tradeReturns.length} trades over ${yearsSpanned.toFixed(1)}y, 1000 iters):`);
     console.log(`  Sharpe p05=${mc.sharpe.p05}  p50=${mc.sharpe.p50}  p95=${mc.sharpe.p95}`);
     console.log(`  MaxDD  p05=${mc.maxDrawdown.p05} p50=${mc.maxDrawdown.p50} p95=${mc.maxDrawdown.p95}`);
   } else {
