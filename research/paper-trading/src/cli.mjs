@@ -67,6 +67,10 @@ import { buildDailyDigest } from "./report/dailyDigest.mjs";
 import { asciiChart } from "./report/asciiChart.mjs";
 import { logManualTrade, roundTripTrades } from "./journal/manualLog.mjs";
 import { edgeReport } from "./journal/edgeReport.mjs";
+import { openShadow, evaluateBook, shadowReport, readBook } from "./shadow/shadowBook.mjs";
+import { logPlan, markPlan, adherenceStats, readAllPlans } from "./decision/tradePlan.mjs";
+import { preTradeChecklist } from "./decision/preTradeChecklist.mjs";
+import { notify } from "./notify/index.mjs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -349,6 +353,87 @@ async function cmdEdge(args) {
   console.log(JSON.stringify(report, null, 2));
 }
 
+// ---------- Shadow trading (forward paper) ----------
+
+async function cmdShadowOpen(args) {
+  const rec = await openShadow({
+    symbol: args.symbol,
+    side: args.side,
+    qty: Number(args.qty),
+    stop: Number(args.stop),
+    target: Number(args.target),
+    setup: args.setup || null,
+    reason: args.reason || "",
+    entry: args.entry ? Number(args.entry) : null,
+  });
+  console.log(JSON.stringify(rec, null, 2));
+}
+async function cmdShadowEvaluate() {
+  const r = await evaluateBook();
+  console.log(JSON.stringify(r, null, 2));
+}
+async function cmdShadowReport() {
+  console.log(JSON.stringify(await shadowReport(), null, 2));
+}
+async function cmdShadowList() {
+  const items = await readBook();
+  console.table(items.map((x) => ({
+    id: x.shadowId.slice(0, 8),
+    symbol: x.symbol, side: x.side, qty: x.qty,
+    entry: x.entry, stop: x.stop, target: x.target,
+    status: x.status, pnl: x.pnl ?? "",
+  })));
+}
+
+// ---------- Plan / pre-trade checklist ----------
+
+async function cmdPlan(args) {
+  const plan = {
+    symbol: args.symbol,
+    side: args.side,
+    qty: Number(args.qty),
+    entry: Number(args.entry),
+    stop: Number(args.stop),
+    target: Number(args.target),
+    setup: args.setup,
+    reason: args.reason || "",
+  };
+  const rec = await logPlan(plan);
+  console.log(JSON.stringify(rec, null, 2));
+}
+async function cmdPlanMark(args) {
+  const rec = await markPlan(args.id, {
+    followed: args.followed !== "false",
+    notes: args.notes || "",
+  });
+  console.log(JSON.stringify(rec, null, 2));
+}
+async function cmdAdherence() {
+  console.log(JSON.stringify(await adherenceStats(), null, 2));
+}
+async function cmdCheck(args) {
+  const plan = {
+    symbol: args.symbol, side: args.side, qty: Number(args.qty),
+    entry: Number(args.entry), stop: Number(args.stop), target: Number(args.target),
+    setup: args.setup,
+  };
+  const recentEdge = await edgeReport({});
+  const ctx = {
+    plan,
+    equity: Number(args.equity || 100000),
+    openPositions: args.open ? JSON.parse(args.open) : [],
+    todayPlans: Number(args["today-plans"] || 0),
+    recentEdge,
+  };
+  console.log(JSON.stringify(preTradeChecklist(ctx), null, 2));
+}
+
+async function cmdNotify(args) {
+  const ch = (args.channels || "stdout").split(",");
+  const results = await notify({ title: args.title || "Test", body: args.body || "hello", channels: ch });
+  console.log(JSON.stringify(results, null, 2));
+}
+
 // ---------- Misc ----------
 
 async function cmdCurriculum() {
@@ -376,6 +461,9 @@ Commands:
   news | filings | calendar | digest
   red-team | coach | scout
   log | edge
+  shadow-open | shadow-evaluate | shadow-report | shadow-list
+  plan | plan-mark | adherence | check
+  notify
   curriculum | runs
 
 Run with --help on any subcommand name for usage stubs; see src/cli.mjs source for the full list.`;
@@ -391,6 +479,13 @@ async function main() {
     news: cmdNews, filings: cmdFilings, calendar: cmdCalendar, digest: cmdDigest,
     "red-team": cmdRedTeam, coach: cmdCoach, scout: cmdScout,
     log: cmdLog, edge: cmdEdge,
+    "shadow-open": cmdShadowOpen,
+    "shadow-evaluate": cmdShadowEvaluate,
+    "shadow-report": cmdShadowReport,
+    "shadow-list": cmdShadowList,
+    plan: cmdPlan, "plan-mark": cmdPlanMark, adherence: cmdAdherence,
+    check: cmdCheck,
+    notify: cmdNotify,
     curriculum: cmdCurriculum, runs: cmdRuns,
   };
   const fn = table[cmd];

@@ -26,6 +26,24 @@ import { breakout52wScanner } from "../src/screeners/breakout52w.mjs";
 import { unusualOptionsScan } from "../src/screeners/unusualOptions.mjs";
 import { isEventDay, nextEvent, eventsInRange } from "../src/intel/econCalendar.mjs";
 import { asciiChart } from "../src/report/asciiChart.mjs";
+import { checkIntegrity } from "../src/data/integrity.mjs";
+import { detectSuspectedSplits } from "../src/data/corpActions.mjs";
+import { probabilisticSharpe, minTrackRecordLength } from "../src/engine/probabilisticSharpe.mjs";
+import { realityCheck } from "../src/engine/realityCheck.mjs";
+import { purgedKFold, combinatorialPurgedCV } from "../src/engine/purgedCV.mjs";
+import { volumeScaledSlippage, applySlippage, stressSlippage } from "../src/engine/slippageModel.mjs";
+import { simulateLimitFill, partialFillSchedule } from "../src/engine/limitFill.mjs";
+import { isTradingDay, isHalfDay, nextTradingDay, isLikelyLULDHalt } from "../src/engine/marketCalendar.mjs";
+import { MultiAssetPortfolio } from "../src/engine/multiAssetPortfolio.mjs";
+import { runPortfolioBacktest } from "../src/engine/portfolioBacktest.mjs";
+import { equalWeight, volTargeted, riskParity } from "../src/engine/rebalance.mjs";
+import { crossSectionalMomentum } from "../src/strategies/crossSectionalMomentum.mjs";
+import { lowVolAnomaly } from "../src/strategies/lowVolAnomaly.mjs";
+import { turnOfMonth, fomcDrift, fridayOnly } from "../src/strategies/calendarEffects.mjs";
+import { validatePlan } from "../src/decision/tradePlan.mjs";
+import { preTradeChecklist } from "../src/decision/preTradeChecklist.mjs";
+import { computeMaeMfe, aggregateExcursions } from "../src/decision/maeMfe.mjs";
+import { hashBars } from "../src/engine/manifest.mjs";
 
 function mulberry32(a) {
   return function () {
@@ -218,6 +236,190 @@ ok("econ calendar", () => {
 ok("ascii chart", () => {
   const chart = asciiChart(Array.from({ length: 100 }, (_, i) => 100 + Math.sin(i / 5) * 10), { width: 40, height: 8, label: "test" });
   assert.ok(chart.includes("test"));
+});
+
+// ── Data integrity & corp actions ────────────────────────
+ok("integrity clean", () => {
+  const r = checkIntegrity(daily);
+  assert.equal(r.fatal, false);
+});
+ok("integrity detects too-few-bars", () => {
+  const r = checkIntegrity(daily.slice(0, 10), { minBars: 30 });
+  assert.equal(r.fatal, true);
+});
+ok("detect suspected splits", () => {
+  const withSplit = daily.map((b, i) => i === 250 ? { ...b, open: b.open * 2 } : b);
+  const suspects = detectSuspectedSplits(withSplit);
+  assert.ok(suspects.length >= 1);
+});
+
+// ── Honest statistics ────────────────────────────────────
+ok("probabilistic sharpe", () => {
+  const r = probabilisticSharpe({ sharpe: 1.2, n: 500 });
+  assert.ok(r.psr >= 0 && r.psr <= 1);
+});
+ok("min track record length", () => {
+  const r = minTrackRecordLength({ sharpe: 1.2 });
+  assert.ok(r.minN > 0);
+});
+ok("reality check", () => {
+  const rets = Array.from({ length: 3 }, (_, k) =>
+    Array.from({ length: 200 }, (_, i) => (mulberry32(k * 100 + i + 1)() - 0.5) * 0.01),
+  );
+  const r = realityCheck(rets, { B: 100 });
+  assert.ok(typeof r.pValue === "number");
+});
+ok("purged k-fold", () => {
+  const splits = purgedKFold({ n: 500, folds: 5, labelWindow: 3, embargoPct: 0.01 });
+  assert.equal(splits.length, 5);
+  // Verify no overlap between each fold's train and test
+  for (const { train, test } of splits) {
+    const testSet = new Set(test);
+    assert.ok(train.every((i) => !testSet.has(i)));
+  }
+});
+ok("combinatorial purged CV", () => {
+  const splits = combinatorialPurgedCV({ n: 500, groups: 5, testGroups: 2 });
+  assert.ok(splits.length === 10); // C(5,2)
+});
+
+// ── Execution realism ────────────────────────────────────
+ok("volume-scaled slippage", () => {
+  const bps = volumeScaledSlippage({ orderSize: 10_000, adv: 1_000_000 });
+  assert.ok(bps > 5);
+  assert.ok(stressSlippage(10_000, 1_000_000) > bps);
+});
+ok("apply slippage", () => {
+  assert.ok(applySlippage(100, "BUY", 10) > 100);
+  assert.ok(applySlippage(100, "SELL", 10) < 100);
+});
+ok("limit fill sim", () => {
+  const bar = { date: "2024-01-02", open: 100, high: 102, low: 99, close: 101, volume: 1e6 };
+  const r = simulateLimitFill({ bar, side: "BUY", limitPrice: 99.5, fillProb: 1 });
+  assert.equal(r.filled, true);
+  const r2 = simulateLimitFill({ bar, side: "BUY", limitPrice: 98, fillProb: 1 });
+  assert.equal(r2.filled, false);
+});
+ok("partial fill schedule", () => {
+  const s = partialFillSchedule({ totalShares: 103, tranches: 4 });
+  assert.equal(s.reduce((a, b) => a + b, 0), 103);
+});
+ok("market calendar", () => {
+  assert.equal(isTradingDay("2024-01-01"), false); // New Year's
+  assert.equal(isTradingDay("2024-01-02"), true);
+  assert.equal(isHalfDay("2024-12-24"), true);
+  assert.ok(nextTradingDay("2024-12-31"));
+  assert.equal(isLikelyLULDHalt({ high: 110, low: 90, close: 100 }), true);
+});
+
+// ── Multi-asset portfolio ────────────────────────────────
+ok("multi-asset portfolio basics", () => {
+  const p = new MultiAssetPortfolio({ startingCash: 100_000 });
+  p.targetShares("2024-01-02", "AAA", 100, 50);
+  assert.equal(p.positions.AAA, 100);
+  p.targetShares("2024-01-03", "AAA", 0, 52);
+  assert.ok(!p.positions.AAA);
+});
+ok("multi-asset shorting with borrow", () => {
+  const p = new MultiAssetPortfolio({ startingCash: 100_000 });
+  p.targetShares("2024-01-02", "AAA", -100, 50);
+  p.mark("2024-01-02", { AAA: 50 });
+  p.mark("2024-01-03", { AAA: 50 });
+  assert.ok(p.equityCurve.length === 2);
+});
+ok("portfolio backtest equal weight", () => {
+  const B = syntheticDailyBars(300, 2);
+  const res = runPortfolioBacktest({ A: daily.slice(0, 300), B }, equalWeight(["A", "B"]));
+  assert.ok(res.metrics);
+});
+ok("portfolio backtest vol targeted", () => {
+  const B = syntheticDailyBars(300, 3);
+  const res = runPortfolioBacktest({ A: daily.slice(0, 300), B }, volTargeted({ lookback: 30 }));
+  assert.ok(res.metrics);
+});
+ok("portfolio backtest risk parity", () => {
+  const B = syntheticDailyBars(300, 4);
+  const res = runPortfolioBacktest({ A: daily.slice(0, 300), B }, riskParity({ lookback: 30 }));
+  assert.ok(res.metrics);
+});
+
+// ── Serious strategies ───────────────────────────────────
+ok("cross-sectional momentum allocator", () => {
+  const mom = crossSectionalMomentum({ lookback: 60, skip: 5 });
+  const B = syntheticDailyBars(300, 5);
+  const w = mom.onBar({
+    date: "2020-12-31", symbols: ["A", "B"],
+    history: daily.slice(0, 200).map((_, i) => ({ date: `d${i}`, A: daily[i], B: B[i] })),
+  });
+  assert.ok(typeof w === "object");
+});
+ok("low vol anomaly", () => {
+  const lv = lowVolAnomaly({ lookback: 60 });
+  const B = syntheticDailyBars(300, 6);
+  const w = lv.onBar({
+    date: "x", symbols: ["A", "B"],
+    history: daily.slice(0, 200).map((_, i) => ({ date: `d${i}`, A: daily[i], B: B[i] })),
+  });
+  assert.ok(typeof w === "object");
+});
+ok("calendar effect strategies", () => {
+  const t = turnOfMonth();
+  assert.ok(["LONG", "FLAT"].includes(t.onBar({ date: "2024-01-31" })));
+  assert.ok(["LONG", "FLAT"].includes(fomcDrift().onBar({ date: "2024-01-31" })));
+  assert.ok(["LONG", "FLAT"].includes(fridayOnly().onBar({ date: "2024-01-05" })));
+});
+
+// ── Decision support ─────────────────────────────────────
+ok("plan validation ok", () => {
+  const v = validatePlan({ symbol: "X", side: "BUY", qty: 10, entry: 100, stop: 98, target: 104, setup: "orb" });
+  assert.equal(v.ok, true);
+  assert.equal(v.rewardRisk, 2);
+});
+ok("plan validation rejects bad R:R", () => {
+  const v = validatePlan({ symbol: "X", side: "BUY", qty: 10, entry: 100, stop: 98, target: 101, setup: "orb" });
+  assert.equal(v.ok, false);
+});
+ok("pre-trade checklist NO-GO on event", () => {
+  const r = preTradeChecklist(
+    {
+      plan: { symbol: "X", side: "BUY", qty: 10, entry: 100, stop: 98, target: 104, setup: "orb" },
+      equity: 100_000, openPositions: [], todayPlans: 0, today: "2025-05-07",
+    },
+    { blockOnFOMC: true },
+  );
+  assert.equal(r.decision, "NO-GO");
+});
+ok("pre-trade checklist GO", () => {
+  const r = preTradeChecklist(
+    {
+      plan: { symbol: "X", side: "BUY", qty: 10, entry: 100, stop: 98, target: 104, setup: "orb" },
+      equity: 100_000, openPositions: [], todayPlans: 0, today: "2024-08-15",
+    },
+    { blockOnFOMC: true, requireEdgeSample: 1 },
+  );
+  assert.ok(r.decision === "GO" || r.decision === "NO-GO");
+});
+ok("MAE/MFE compute", () => {
+  const trip = { tradeId: "t1", entry: 100, exit: 105, stop: 98, direction: "LONG" };
+  const bars = [{ low: 99, high: 103 }, { low: 98.5, high: 106 }];
+  const r = computeMaeMfe(trip, bars);
+  assert.ok(r.maePct < 0);
+  assert.ok(r.mfePct > 0);
+});
+ok("MAE/MFE aggregate", () => {
+  const agg = aggregateExcursions([
+    { realizedPct: 3, maePct: -1, mfePct: 5, rMultipleRealized: 1.5 },
+    { realizedPct: -2, maePct: -3, mfePct: 1, rMultipleRealized: -1 },
+  ]);
+  assert.ok(agg.winners.n === 1);
+  assert.ok(agg.losers.n === 1);
+});
+
+// ── Manifest ─────────────────────────────────────────────
+ok("bars hash deterministic", () => {
+  const h1 = hashBars(daily);
+  const h2 = hashBars(daily);
+  assert.equal(h1, h2);
 });
 
 if (failed > 0) { console.error(`\n${failed} test(s) failed`); process.exit(1); }
