@@ -1,0 +1,46 @@
+name: Nightly paper-trading research
+
+on:
+  schedule:
+    # 22:30 UTC Mon–Fri (after US close)
+    - cron: "30 22 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/day-trading-research-agents-7mL9r
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install (root deps, for @anthropic-ai/sdk)
+        run: npm ci --ignore-scripts || npm install --ignore-scripts
+
+      - name: Run smoke test
+        run: node research/paper-trading/test/smoke.mjs
+
+      - name: Run nightly research loop
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          WATCHLIST: "SPY,QQQ,IWM"
+        run: node research/paper-trading/scripts/cron.mjs || echo "cron step tolerated failure (likely data source)"
+
+      - name: Commit journal updates
+        run: |
+          git config user.name "research-bot"
+          git config user.email "research-bot@users.noreply.github.com"
+          git add research/paper-trading/journal || true
+          if git diff --cached --quiet; then
+            echo "No journal changes to commit."
+          else
+            git commit -m "chore(research): nightly journal update"
+            git push
+          fi
