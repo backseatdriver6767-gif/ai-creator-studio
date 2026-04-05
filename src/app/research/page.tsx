@@ -95,6 +95,55 @@ type LlmUsageRow = {
   error?: string;
 };
 
+type PromotedEntry = {
+  symbol: string;
+  setup: string;
+  strategy?: string;
+  plan: {
+    symbol: string;
+    side: "BUY" | "SHORT";
+    qty: number;
+    entry: number;
+    stop: number;
+    target: number;
+    setup: string;
+    reason?: string;
+  };
+  sizing?: { shares: number; riskDollars?: number; notional?: number };
+  asOf?: string;
+  shadowId?: string;
+};
+
+type RejectedEntry = {
+  symbol: string;
+  setup?: string | null;
+  strategy?: string | null;
+  stage?: "signal" | "checklist" | "open";
+  reason: string;
+};
+
+type SkippedEntry = {
+  symbol: string;
+  setup?: string | null;
+  reason: string;
+};
+
+type PromotionReport = {
+  ts: string;
+  date: string;
+  dryRun: boolean;
+  maxPerDay?: number;
+  riskPct?: number;
+  symbolsConsidered: number;
+  equity?: number;
+  watchlistDate?: string;
+  watchlistUniverse?: string;
+  promoted: PromotedEntry[];
+  rejected: RejectedEntry[];
+  skipped: SkippedEntry[];
+  errors: string[];
+};
+
 // Mirror of research/paper-trading/src/journal/account.mjs `reduceEvents`,
 // reimplemented in TS so the dashboard can reduce the event log without
 // importing the .mjs module across package boundaries. Pure.
@@ -374,6 +423,129 @@ function OpenPositions({ open }: { open: ShadowRec[] }) {
   );
 }
 
+// Auto-promoter decision panel — shows the latest promotion report.
+// Three possible visual states:
+//   1. No report on disk (panel invites user to run it)
+//   2. Report with promoted trades (primary view — table of plans)
+//   3. Report with only rejections (secondary view — explanations)
+function PromotionsPanel({ report }: { report: PromotionReport | null }) {
+  if (!report) {
+    return (
+      <p style={{ color: "#888", fontSize: 12 }}>
+        No auto-promote runs yet. The nightly cron will start recording decisions
+        to <code>journal/promotions.jsonl</code>.
+      </p>
+    );
+  }
+  const modeLabel = report.dryRun ? "DRY RUN" : "LIVE";
+  const modeColor = report.dryRun ? "#cc6" : "#6c6";
+  return (
+    <div>
+      <p style={{ color: "#888", fontSize: 12, marginTop: 0 }}>
+        Run: <span style={{ color: "#ccc" }}>{report.date}</span>{" "}
+        <span style={{ color: modeColor }}>[{modeLabel}]</span> ·{" "}
+        Considered <span style={{ color: "#ccc" }}>{report.symbolsConsidered}</span> symbols ·{" "}
+        Equity <span style={{ color: "#ccc" }}>${report.equity?.toFixed(2) ?? "?"}</span>
+        {report.watchlistDate ? <> · Watchlist <span style={{ color: "#ccc" }}>{report.watchlistDate}</span></> : null}
+      </p>
+      {report.promoted.length > 0 ? (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginBottom: 16 }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
+              <th style={{ padding: 6 }}>Symbol</th>
+              <th>Setup</th>
+              <th>Strategy</th>
+              <th>Entry</th>
+              <th>Stop</th>
+              <th>Target</th>
+              <th>Qty</th>
+              <th>R:R</th>
+              <th>Shadow</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.promoted.map((p, i) => {
+              const rr =
+                p.plan.entry !== p.plan.stop
+                  ? (p.plan.target - p.plan.entry) / (p.plan.entry - p.plan.stop)
+                  : 0;
+              return (
+                <tr key={`${p.shadowId ?? p.symbol}-${i}`} style={{ borderBottom: "1px solid #222" }}>
+                  <td style={{ padding: 6, fontWeight: 600 }}>{p.symbol}</td>
+                  <td style={{ color: "#aaa" }}>{p.setup}</td>
+                  <td style={{ color: "#888" }}>{p.strategy ?? ""}</td>
+                  <td>${p.plan.entry.toFixed(2)}</td>
+                  <td>${p.plan.stop.toFixed(2)}</td>
+                  <td>${p.plan.target.toFixed(2)}</td>
+                  <td>{p.plan.qty}</td>
+                  <td style={{ color: "#6c6" }}>{rr.toFixed(2)}R</td>
+                  <td style={{ color: "#666", fontSize: 10 }}>
+                    {p.shadowId ? p.shadowId.slice(0, 8) : "(dry-run)"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <p style={{ color: "#888", fontSize: 12, marginBottom: 16 }}>
+          No trades promoted on this run.
+        </p>
+      )}
+      {report.rejected.length > 0 && (
+        <details style={{ marginBottom: 8 }}>
+          <summary style={{ cursor: "pointer", color: "#888", fontSize: 12 }}>
+            Rejected ({report.rejected.length})
+          </summary>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, marginTop: 8 }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #222", color: "#666" }}>
+                <th style={{ padding: 4 }}>Symbol</th>
+                <th>Setup</th>
+                <th>Stage</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.rejected.map((r, i) => (
+                <tr key={`${r.symbol}-${i}`} style={{ borderBottom: "1px solid #1a1a1a" }}>
+                  <td style={{ padding: 4, color: "#aaa" }}>{r.symbol}</td>
+                  <td style={{ color: "#888" }}>{r.setup ?? "-"}</td>
+                  <td style={{ color: "#666" }}>{r.stage ?? "-"}</td>
+                  <td style={{ color: "#888" }}>{r.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+      {report.skipped.length > 0 && (
+        <details>
+          <summary style={{ cursor: "pointer", color: "#888", fontSize: 12 }}>
+            Skipped ({report.skipped.length})
+          </summary>
+          <ul style={{ color: "#888", fontSize: 11, margin: "8px 0 0 16px" }}>
+            {report.skipped.map((s, i) => (
+              <li key={`${s.symbol}-${i}`}>
+                <code>{s.symbol}</code>
+                {s.setup ? ` (${s.setup})` : ""}: {s.reason}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {report.errors.length > 0 && (
+        <div style={{ marginTop: 12, padding: 8, border: "1px solid #442", background: "#1a1005", fontSize: 11 }}>
+          <div style={{ color: "#c66", marginBottom: 4 }}>Errors ({report.errors.length}):</div>
+          <ul style={{ color: "#caa", margin: "0 0 0 16px" }}>
+            {report.errors.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Agent activity feed — last N LLM calls from journal/llm-usage.jsonl.
 function AgentFeed({ rows }: { rows: LlmUsageRow[] }) {
   if (rows.length === 0) {
@@ -426,6 +598,12 @@ async function readLatestWatchlistEntry(): Promise<WatchlistEntry | null> {
   return all.length ? all[all.length - 1] : null;
 }
 
+// Read the last promotion report from the JSONL log. Server-side, O(file).
+async function readLatestPromotionReport(): Promise<PromotionReport | null> {
+  const all = await readJsonl<PromotionReport>("promotions.jsonl");
+  return all.length ? all[all.length - 1] : null;
+}
+
 export default async function ResearchPage() {
   const runs = (await readJsonl<Run>("runs.jsonl")).slice(-20).reverse();
   const trades = await readJsonl<Trip>("manual-trades.jsonl");
@@ -433,6 +611,7 @@ export default async function ResearchPage() {
   const shadows = await readJsonl<ShadowRec>("shadow-book.jsonl");
   const usageRows = (await readJsonl<LlmUsageRow>("llm-usage.jsonl")).slice(-20).reverse();
   const latestWatchlist = await readLatestWatchlistEntry();
+  const latestPromotion = await readLatestPromotionReport();
 
   const openPositions = shadows.filter((s) => s.status === "open");
   const accountSnap = reduceAccount(accountEvents, openPositions.length);
@@ -455,6 +634,11 @@ export default async function ResearchPage() {
       <section style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 18 }}>Today&apos;s watchlist (screener-picked)</h2>
         <WatchlistPanel entry={latestWatchlist} />
+      </section>
+
+      <section style={{ marginBottom: 40 }}>
+        <h2 style={{ fontSize: 18 }}>Last night&apos;s promotions (auto-promoter)</h2>
+        <PromotionsPanel report={latestPromotion} />
       </section>
 
       <section style={{ marginBottom: 40 }}>

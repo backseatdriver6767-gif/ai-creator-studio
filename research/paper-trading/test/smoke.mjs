@@ -53,6 +53,13 @@ import { filterFills, roundTrips, edgeSummary } from "../src/journal/query.mjs";
 import { randomSearch, enumerateGrid } from "../src/engine/randomSearch.mjs";
 import { reduceEvents, buildEquityHistory } from "../src/journal/account.mjs";
 import { buildWatchlist } from "../src/screeners/watchlistBuilder.mjs";
+import {
+  replayStrategy,
+  detectFreshLongSignal,
+  buildLongPlan,
+  evaluateSymbol,
+  openShadowsToPositions,
+} from "../src/decision/autoPromoter.mjs";
 
 function mulberry32(a) {
   return function () {
@@ -782,6 +789,150 @@ ok("watchlist builder topN respects requested size", () => {
   assert.equal(r.survivors, 5);
   assert.equal(r.topN.length, 3);
   assert.equal(r.topN[0].symbol, "A");
+});
+
+// ---- auto-promoter ----------------------------------------------------------
+//
+// Build a synthetic bar series that:
+//   - starts flat near $100 (fast SMA below slow SMA for ~60 bars)
+//   - then rips upward so the 20-SMA crosses above the 50-SMA on the last bar
+//
+// This lets us deterministically trigger a fresh LONG signal for
+// smaCrossover without any network.
+
+function barsFromCloses(closes) {
+  return closes.map((c, i) => ({
+    date: new Date(2024, 0, 2 + i).toISOString().slice(0, 10),
+    open: c,
+    high: c * 1.01,
+    low: c * 0.99,
+    close: c,
+    volume: 5_000_000,
+  }));
+}
+
+function risingCrossoverCloses() {
+  // 90 flat bars around 100 — fast SMA == slow SMA → FLAT.
+  // Then ONE final rip bar at 105 — fast SMA nudges above slow SMA → LONG.
+  // This keeps the second-to-last bar FLAT and the last bar LONG, which is
+  // exactly what detectFreshLongSignal looks for.
+  const closes = [];
+  for (let i = 0; i < 90; i++) closes.push(100);
+  closes.push(105);
+  return closes;
+}
+
+function flatCloses(n = 90) {
+  return Array.from({ length: n }, () => 100);
+}
+
+ok("auto-promoter replayStrategy returns signal per bar", () => {
+  const strat = smaCrossover({ fast: 20, slow: 50 });
+  const bars = barsFromCloses(risingCrossoverCloses());
+  const sigs = replayStrategy(strat, bars);
+  assert.equal(sigs.length, bars.length);
+  // Flat portion should be FLAT (closes < 50 bars → "FLAT" path)
+  assert.equal(sigs[10], "FLAT");
+  // After the rip, last bar should be LONG
+  assert.equal(sigs[sigs.length - 1], "LONG");
+});
+
+ok("auto-promoter detectFreshLongSignal only fires on FLAT→LONG", () => {
+  assert.equal(detectFreshLongSignal([]), null);
+  assert.equal(detectFreshLongSignal(["FLAT"]), null);
+  assert.equal(detectFreshLongSignal(["FLAT", "FLAT"]), null);
+  assert.equal(detectFreshLongSignal(["FLAT", "LONG"]), "LONG");
+  assert.equal(detectFreshLongSignal(["LONG", "LONG"]), null);
+  assert.equal(detectFreshLongSignal(["LONG", "FLAT"]), null);
+});
+
+ok("auto-promoter buildLongPlan produces a validatable BUY plan", () => {
+  const bars = barsFromCloses(risingCrossoverCloses());
+  const built = buildLongPlan({
+    symbol: "TEST",
+    bars,
+    setup: "sma_crossover",
+    equity: 10000,
+    riskPct: 0.01,
+  });
+  assert.ok(built, "expected a plan");
+  const { plan } = built;
+  assert.equal(plan.symbol, "TEST");
+  assert.equal(plan.side, "BUY");
+  assert.ok(plan.qty > 0, "qty > 0");
+  assert.ok(plan.entry > 0);
+  assert.ok(plan.stop < plan.entry, "BUY stop < entry");
+  assert.ok(plan.target > plan.entry, "BUY target > entry");
+  // 2R target → R:R should be ~2.0, always ≥ 1.5 to clear checklist default
+  const rr = (plan.target - plan.entry) / (plan.entry - plan.stop);
+  assert.ok(rr >= 1.49 && rr <= 2.01, `R:R ${rr.toFixed(3)} out of range`);
+  // Plan passes hygiene validation
+  const v = validatePlan(plan);
+  assert.equal(v.ok, true, v.errors?.join("; "));
+});
+
+ok("auto-promoter buildLongPlan returns null when bars are too short", () => {
+  const bars = barsFromCloses([100, 101, 102]);
+  const built = buildLongPlan({
+    symbol: "TEST",
+    bars,
+    setup: "sma_crossover",
+    equity: 10000,
+    riskPct: 0.01,
+  });
+  assert.equal(built, null);
+});
+
+ok("auto-promoter evaluateSymbol emits GO attempt when signal + sizing valid", () => {
+  const bars = barsFromCloses(risingCrossoverCloses());
+  const { attempts } = evaluateSymbol({
+    symbol: "TEST",
+    bars,
+    equity: 10000,
+    riskPct: 0.01,
+    strategies: [
+      { setup: "sma_crossover", factory: () => smaCrossover({ fast: 20, slow: 50 }) },
+    ],
+  });
+  assert.equal(attempts.length, 1);
+  assert.equal(attempts[0].ok, true, attempts[0].reason);
+  assert.equal(attempts[0].plan.setup, "sma_crossover");
+});
+
+ok("auto-promoter evaluateSymbol rejects when no fresh signal", () => {
+  const bars = barsFromCloses(flatCloses(90));
+  const { attempts } = evaluateSymbol({
+    symbol: "TEST",
+    bars,
+    equity: 10000,
+    riskPct: 0.01,
+    strategies: [
+      { setup: "sma_crossover", factory: () => smaCrossover({ fast: 20, slow: 50 }) },
+    ],
+  });
+  assert.equal(attempts.length, 1);
+  assert.equal(attempts[0].ok, false);
+  assert.match(attempts[0].reason, /no fresh LONG signal/);
+});
+
+ok("auto-promoter evaluateSymbol short-circuits on insufficient bars", () => {
+  const bars = barsFromCloses([100, 101, 102]);
+  const { attempts } = evaluateSymbol({ symbol: "TEST", bars, equity: 10000, riskPct: 0.01 });
+  assert.equal(attempts.length, 1);
+  assert.equal(attempts[0].ok, false);
+  assert.match(attempts[0].reason, /insufficient bars/);
+});
+
+ok("auto-promoter openShadowsToPositions maps shadow book to heat input shape", () => {
+  const book = [
+    { status: "open",   symbol: "A", side: "BUY", qty: 10, entry: 100, stop: 95, target: 110 },
+    { status: "closed", symbol: "B", side: "BUY", qty: 20, entry: 50,  stop: 48, target: 54 },
+    { status: "open",   symbol: "C", side: "BUY", qty: 5,  entry: 200, stop: 190, target: 220 },
+  ];
+  const positions = openShadowsToPositions(book);
+  assert.equal(positions.length, 2);
+  assert.deepEqual(positions[0], { symbol: "A", shares: 10, entry: 100, stop: 95 });
+  assert.deepEqual(positions[1], { symbol: "C", shares: 5,  entry: 200, stop: 190 });
 });
 
 if (failed > 0) { console.error(`\n${failed} test(s) failed`); process.exit(1); }

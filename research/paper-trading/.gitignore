@@ -7,6 +7,7 @@ journal/manual-trades.jsonl
 journal/shadow-book.jsonl
 journal/account.jsonl
 journal/watchlist.jsonl
+journal/promotions.jsonl
 journal/plans.jsonl
 journal/corp-actions.json
 journal/digests/

@@ -37,6 +37,11 @@ const ENV_WATCHLIST = process.env.WATCHLIST
   : null;
 const SKIP_SCREENER = process.env.PAPER_TRADING_SKIP_SCREENER === "1";
 const WATCHLIST_TOP_N = Number(process.env.WATCHLIST_TOP_N || 5);
+// Cron runs in live mode by default (the whole point is to run autonomously).
+// Override with PAPER_TRADING_AUTOPROMOTE_DRY_RUN=1 to dry-run just the promoter.
+const AUTOPROMOTE_DRY_RUN = process.env.PAPER_TRADING_AUTOPROMOTE_DRY_RUN === "1";
+const SKIP_AUTOPROMOTE = process.env.PAPER_TRADING_SKIP_AUTOPROMOTE === "1";
+const SKIP_ACCOUNT_SYNC = process.env.PAPER_TRADING_SKIP_ACCOUNT_SYNC === "1";
 
 const today = new Date().toISOString().slice(0, 10);
 const LOG_FILE = path.join(LOG_DIR, `cron-${today}.log`);
@@ -155,12 +160,35 @@ async function main() {
   }
 
   // 3. Shadow blotter evaluation (marks open shadow trades against latest bars).
+  //    This MUST run before account-sync so closed trades are credited in the
+  //    same loop they were closed in.
   await record("shadow-evaluate", await runStep("shadow-evaluate", ["shadow-evaluate"]));
 
-  // 4. Plan adherence stats for the most recent window.
+  // 4. Account ledger sync — credits newly-closed shadow trades + manual
+  //    trades into the event-sourced hypothetical bank account. Idempotent by
+  //    design; safe to run every night even if nothing changed.
+  if (!SKIP_ACCOUNT_SYNC) {
+    await record("account-sync", await runStep("account-sync", ["account-sync"]));
+  } else {
+    await logLine("account-sync skipped (PAPER_TRADING_SKIP_ACCOUNT_SYNC=1)");
+  }
+
+  // 5. Auto-promoter — looks at today's watchlist, runs registered strategies
+  //    against fresh bars, and (if any pass the pre-trade checklist) opens
+  //    paper shadow trades. LIVE by default; override with
+  //    PAPER_TRADING_AUTOPROMOTE_DRY_RUN=1 to inspect decisions without
+  //    writing to the shadow book.
+  if (!SKIP_AUTOPROMOTE) {
+    const autoArgs = AUTOPROMOTE_DRY_RUN ? ["auto-promote"] : ["auto-promote", "--live"];
+    await record("auto-promote", await runStep("auto-promote", autoArgs));
+  } else {
+    await logLine("auto-promote skipped (PAPER_TRADING_SKIP_AUTOPROMOTE=1)");
+  }
+
+  // 6. Plan adherence stats for the most recent window.
   await record("adherence", await runStep("adherence", ["adherence"]));
 
-  // 5. Daily digest — written last so it can pick up the other outputs.
+  // 7. Daily digest — written last so it can pick up the other outputs.
   await record(
     "digest",
     await runStep("digest", ["digest", "--symbols", watchlist.join(",")]),

@@ -78,6 +78,7 @@ import { evaluateKillSwitch } from "./decision/killSwitch.mjs";
 import { loadAllFills, filterFills, roundTrips, edgeSummary } from "./journal/query.mjs";
 import { initAccount, currentEquity, syncFromSources, equityHistory, isInitialized } from "./journal/account.mjs";
 import { runWatchlistBuild, readLatestWatchlist } from "./screeners/watchlistRunner.mjs";
+import { runAutoPromote, readLatestPromotion } from "./decision/autoPromoter.mjs";
 import { logPlan, markPlan, adherenceStats, readAllPlans } from "./decision/tradePlan.mjs";
 import { preTradeChecklist } from "./decision/preTradeChecklist.mjs";
 import { notify } from "./notify/index.mjs";
@@ -629,6 +630,108 @@ async function cmdWatchlistLatest() {
   );
 }
 
+async function cmdAutoPromote(args) {
+  // Default to dry-run unless caller explicitly passes --live.
+  const dryRun = args.live ? false : true;
+  const maxPerDay = args["max-per-day"] ? Number(args["max-per-day"]) : undefined;
+  const riskPct = args.risk ? Number(args.risk) : undefined;
+  const lookback = args.lookback ? Number(args.lookback) : undefined;
+  console.log(
+    `Auto-promoter${dryRun ? " (DRY RUN — no shadow trades will be opened)" : " (LIVE — shadow trades will be recorded)"}…`,
+  );
+  const report = await runAutoPromote({
+    dryRun,
+    ...(maxPerDay !== undefined ? { maxPerDay } : {}),
+    ...(riskPct !== undefined ? { riskPct } : {}),
+    ...(lookback !== undefined ? { lookbackDays: lookback } : {}),
+  });
+  if (report.errors.length) {
+    for (const err of report.errors) console.log(`  ! ${err}`);
+  }
+  console.log(
+    `\nConsidered ${report.symbolsConsidered} symbols from watchlist ${report.watchlistDate ?? "(none)"} · equity=$${report.equity ?? "?"}`,
+  );
+  if (report.promoted.length) {
+    console.log("\nPROMOTED:");
+    console.table(
+      report.promoted.map((p) => ({
+        symbol: p.symbol,
+        setup: p.setup,
+        strategy: p.strategy,
+        entry: p.plan.entry,
+        stop: p.plan.stop,
+        target: p.plan.target,
+        qty: p.plan.qty,
+        rr: round2((p.plan.target - p.plan.entry) / (p.plan.entry - p.plan.stop)),
+        shadowId: p.shadowId ?? "(dry-run)",
+      })),
+    );
+  } else {
+    console.log("\nPROMOTED: (none)");
+  }
+  if (report.rejected.length) {
+    console.log("\nREJECTED:");
+    console.table(
+      report.rejected.map((r) => ({
+        symbol: r.symbol,
+        setup: r.setup ?? "-",
+        stage: r.stage ?? "-",
+        reason: truncate(r.reason, 80),
+      })),
+    );
+  }
+  if (report.skipped.length) {
+    console.log("\nSKIPPED:");
+    console.table(
+      report.skipped.map((s) => ({
+        symbol: s.symbol,
+        setup: s.setup ?? "-",
+        reason: truncate(s.reason, 80),
+      })),
+    );
+  }
+  if (dryRun) {
+    console.log("\nDry run — nothing written to journal/shadow-book.jsonl or journal/promotions.jsonl.");
+    console.log("Re-run with --live to record the promoted trades.");
+  } else {
+    console.log("\nAppended to journal/promotions.jsonl and journal/shadow-book.jsonl.");
+  }
+}
+
+async function cmdAutoPromoteLatest() {
+  const report = await readLatestPromotion();
+  if (!report) {
+    console.log("No auto-promote runs yet. Run: node src/cli.mjs auto-promote --live");
+    return;
+  }
+  console.log(
+    `Latest promotion report: ${report.date} (${report.promoted.length} promoted, ${report.rejected.length} rejected, ${report.skipped.length} skipped)`,
+  );
+  if (report.promoted.length) {
+    console.table(
+      report.promoted.map((p) => ({
+        symbol: p.symbol,
+        setup: p.setup,
+        entry: p.plan.entry,
+        stop: p.plan.stop,
+        target: p.plan.target,
+        qty: p.plan.qty,
+        shadowId: p.shadowId ?? "(dry-run)",
+      })),
+    );
+  }
+}
+
+function round2(x) {
+  if (!Number.isFinite(x)) return null;
+  return Math.round(x * 100) / 100;
+}
+
+function truncate(s, n) {
+  if (!s) return "";
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
 function cmdKillSwitch(args) {
   const snap = {
     sessionStartEquity: Number(args["session-start"]),
@@ -708,6 +811,7 @@ Commands:
   trades
   account-init | account-status | account-sync | account-history
   watchlist-build | watchlist-latest
+  auto-promote | auto-promote-latest
   curriculum | runs
 
 Run with --help on any subcommand name for usage stubs; see src/cli.mjs source for the full list.`;
@@ -744,6 +848,8 @@ async function main() {
     "account-history": cmdAccountHistory,
     "watchlist-build": cmdWatchlistBuild,
     "watchlist-latest": cmdWatchlistLatest,
+    "auto-promote": cmdAutoPromote,
+    "auto-promote-latest": cmdAutoPromoteLatest,
     curriculum: cmdCurriculum, runs: cmdRuns,
   };
   const fn = table[cmd];
