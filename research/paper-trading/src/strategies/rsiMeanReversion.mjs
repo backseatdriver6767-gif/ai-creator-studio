@@ -3,18 +3,15 @@
 export function rsiMeanReversion({ period = 14, buyBelow = 30, sellAbove = 55 } = {}) {
   return {
     name: `RSI(${period},${buyBelow}/${sellAbove})`,
-    init: () => ({ closes: [], prevRsi: null, avgGain: null, avgLoss: null }),
+    init: () => ({ closes: [], lastDesired: "FLAT" }),
     onBar(bar, state) {
       const { closes } = state;
       closes.push(bar.close);
-      if (closes.length < period + 1) return "FLAT";
+      if (closes.length < period + 1) return state.lastDesired;
 
-      const changes = [];
-      for (let i = closes.length - period; i < closes.length; i++) {
-        changes.push(closes[i] - closes[i - 1]);
-      }
       let gains = 0, losses = 0;
-      for (const c of changes) {
+      for (let i = closes.length - period; i < closes.length; i++) {
+        const c = closes[i] - closes[i - 1];
         if (c > 0) gains += c;
         else losses += -c;
       }
@@ -23,10 +20,10 @@ export function rsiMeanReversion({ period = 14, buyBelow = 30, sellAbove = 55 } 
       const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
       const rsi = 100 - 100 / (1 + rs);
 
-      if (rsi < buyBelow) return "LONG";
-      if (rsi > sellAbove) return "FLAT";
-      // hold current state
-      return state.lastDesired || "FLAT";
+      if (rsi < buyBelow) state.lastDesired = "LONG";
+      else if (rsi > sellAbove) state.lastDesired = "FLAT";
+      // otherwise hold previous state
+      return state.lastDesired;
     },
   };
 }

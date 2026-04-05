@@ -19,7 +19,6 @@ export function runPortfolioBacktest(symbolBars, allocator, opts = {}) {
   const pf = new MultiAssetPortfolio(opts);
 
   // Align dates: use the intersection of dates across all symbols
-  const dateSet = null;
   const symbols = Object.keys(symbolBars);
   if (!symbols.length) throw new Error("no symbols");
   const dateLists = symbols.map((s) => symbolBars[s].map((b) => b.date));

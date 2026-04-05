@@ -70,16 +70,28 @@ export class MultiAssetPortfolio {
     const fee = (notional * this.feeBps) / 10_000;
     this.cash -= delta * price; // positive delta (buy) reduces cash
     this.cash -= fee;
-    // Update cost basis on opens/adds (ignore exact basis math for exits)
+    // Update cost basis. Four cases: open-from-flat, add to same direction,
+    // partial exit (keep basis), full flip (new basis at fill price).
     const prev = current;
     const next = current + delta;
-    if ((prev >= 0 && next > prev) || (prev <= 0 && next < prev)) {
+    const sameDirection = Math.sign(prev) === Math.sign(next) && prev !== 0;
+    const crossedZero = prev !== 0 && Math.sign(prev) !== Math.sign(next) && next !== 0;
+    if (prev === 0 && next !== 0) {
+      this.avgCost[symbol] = price;
+    } else if (sameDirection && Math.abs(next) > Math.abs(prev)) {
       const prevCost = (this.avgCost[symbol] || 0) * Math.abs(prev);
-      const newCost = price * Math.abs(delta);
-      this.avgCost[symbol] = (prevCost + newCost) / Math.abs(next || 1);
+      const addCost = price * Math.abs(delta);
+      this.avgCost[symbol] = (prevCost + addCost) / Math.abs(next);
+    } else if (crossedZero) {
+      // The flipped portion's cost basis is the current fill price.
+      this.avgCost[symbol] = price;
     }
+    // partial exits leave avgCost unchanged.
     this.positions[symbol] = next;
-    if (next === 0) delete this.positions[symbol];
+    if (next === 0) {
+      delete this.positions[symbol];
+      delete this.avgCost[symbol];
+    }
     this.fills.push({ date, side, symbol, shares: delta, price: round(price, 4), fee: round(fee, 4) });
   }
 

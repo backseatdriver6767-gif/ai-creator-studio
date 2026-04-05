@@ -56,14 +56,6 @@ export function computeMetrics(equityCurve, fills, startingCash) {
   const grossLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
   const profitFactor = grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : 0;
 
-  // Exposure = fraction of bars spent in the market
-  const barsInMarket = fills
-    .filter((f) => f.side === "SELL")
-    .reduce((s, _, i, arr) => {
-      // crude: assume each round-trip spans (exit index - entry index) bars
-      return s;
-    }, 0);
-
   return {
     startingCash,
     finalEquity: round(finalEquity),
