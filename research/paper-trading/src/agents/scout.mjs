@@ -2,7 +2,16 @@
 // It does NOT browse the web on its own — pass it abstracts or links you
 // already collected. This keeps the loop deterministic and auditable.
 
-import { getClient } from "./client.mjs";
+import { ask } from "./client.mjs";
+
+const FALLBACK = `## Summary
+(Stub — set ANTHROPIC_API_KEY to run scout)
+## Most relevant papers (ranked)
+- No sources analyzed offline.
+## Methods worth trying in our harness
+- None proposed without LLM access.
+## What would be statistically meaningful evidence
+- Out-of-sample Sharpe > 0.5 with > 50 trades and Reality Check p < 0.1.`;
 
 const SYSTEM = `You are a research scout. Given a list of paper titles,
 abstracts, and/or links, produce a structured brief:
@@ -16,10 +25,9 @@ abstracts, and/or links, produce a structured brief:
 Do not invent papers. If the input is empty, say so plainly.`;
 
 export async function scoutBrief({ topic, sources }) {
-  const client = await getClient();
   const user = `Topic: ${topic}
 
 Sources:
 ${JSON.stringify(sources, null, 2)}`;
-  return client.ask(SYSTEM, user);
+  return ask({ system: SYSTEM, user, tier: "balanced", agent: "scout", fallback: FALLBACK });
 }

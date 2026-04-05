@@ -3,7 +3,11 @@
 // it only picks from a whitelist of known strategy constructors and proposes
 // parameters. This keeps the loop safe and bounded.
 
-import { getClient } from "./client.mjs";
+import { ask } from "./client.mjs";
+
+// Structurally valid fallback when no API key is set. Returns an empty
+// experiments array so the caller still gets a parseable object.
+const FALLBACK_JSON = '{"experiments":[]}';
 
 const SYSTEM = `You are a quantitative research assistant. Your job is to propose
 parameter sweeps for a fixed set of trading strategies. You MUST:
@@ -22,7 +26,6 @@ Strategies and valid params:
 `;
 
 export async function proposeExperiments({ prior, budget = 5 }) {
-  const client = await getClient();
   const user = `${STRATEGY_SCHEMA}
 
 Prior results (JSON):
@@ -30,7 +33,13 @@ ${JSON.stringify(prior, null, 2)}
 
 Propose up to ${budget} new experiments to run. Return JSON of shape:
 {"experiments":[{"strategy":"smaCrossover","params":{"fast":10,"slow":40},"rationale":"..."}]}`;
-  const txt = await client.ask(SYSTEM, user);
+  const txt = await ask({
+    system: SYSTEM,
+    user,
+    tier: "balanced",
+    agent: "researcher",
+    fallback: FALLBACK_JSON,
+  });
   return safeParse(txt);
 }
 

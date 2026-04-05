@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  macOS LaunchAgent template for the paper-trading nightly research loop.
+
+  Install (one-time):
+    1. Copy this file to ~/Library/LaunchAgents/com.user.papertrading.cron.plist
+    2. Replace:
+         __REPO_ROOT__   with the absolute path to this repo (e.g. /Users/you/ai-creator-daytrade)
+         __NODE_BIN__    with the absolute path to your node binary (e.g. /opt/homebrew/bin/node)
+         __ANTHROPIC_KEY__ (optional) with your API key if you want real LLM agents;
+                                      otherwise delete the EnvironmentVariables block entirely.
+    3. Load it:
+         launchctl unload ~/Library/LaunchAgents/com.user.papertrading.cron.plist 2>/dev/null
+         launchctl load   ~/Library/LaunchAgents/com.user.papertrading.cron.plist
+    4. Verify:
+         launchctl list | grep papertrading
+
+  Schedule: weeknights at 22:05 local. Adjust the StartCalendarInterval to taste.
+  Logs: research/paper-trading/journal/cron-<date>.log (written by cron.mjs itself)
+        plus stdout/stderr tee to the paths below.
+
+  This is research-only. The harness does not place orders.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.papertrading.cron</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__NODE_BIN__</string>
+        <string>__REPO_ROOT__/research/paper-trading/scripts/cron.mjs</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_ROOT__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>WATCHLIST</key>
+        <string>SPY,QQQ,IWM</string>
+        <!-- Optional: uncomment and fill in to enable real LLM agents.
+        <key>ANTHROPIC_API_KEY</key>
+        <string>__ANTHROPIC_KEY__</string>
+        -->
+    </dict>
+
+    <!-- Weeknights at 22:05 local time -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Weekday</key><integer>1</integer>
+            <key>Hour</key><integer>22</integer>
+            <key>Minute</key><integer>5</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>2</integer>
+            <key>Hour</key><integer>22</integer>
+            <key>Minute</key><integer>5</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>3</integer>
+            <key>Hour</key><integer>22</integer>
+            <key>Minute</key><integer>5</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>4</integer>
+            <key>Hour</key><integer>22</integer>
+            <key>Minute</key><integer>5</integer>
+        </dict>
+        <dict>
+            <key>Weekday</key><integer>5</integer>
+            <key>Hour</key><integer>22</integer>
+            <key>Minute</key><integer>5</integer>
+        </dict>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_ROOT__/research/paper-trading/journal/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__REPO_ROOT__/research/paper-trading/journal/launchd.err.log</string>
+</dict>
+</plist>

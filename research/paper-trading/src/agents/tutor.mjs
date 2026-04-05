@@ -2,7 +2,10 @@
 // agent or hand-written), generates spaced-repetition style questions and
 // grades user answers.
 
-import { getClient } from "./client.mjs";
+import { ask } from "./client.mjs";
+
+const QUESTION_FALLBACK = '{"questions":[]}';
+const GRADE_FALLBACK = '{"score":0,"feedback":"LLM offline — cannot grade."}';
 
 const QUESTION_SYSTEM = `You are a spaced-repetition quiz generator for quant
 trading study notes. Given a set of notes, produce 10 questions that test
@@ -14,14 +17,24 @@ Return strict JSON: {"score": 0..1, "feedback": "..."}. Be fair but firm.
 Partial credit for partial understanding. Wrong facts get 0.`;
 
 export async function generateQuestions(notesText) {
-  const client = await getClient();
-  const txt = await client.ask(QUESTION_SYSTEM, notesText.slice(0, 20_000));
+  const txt = await ask({
+    system: QUESTION_SYSTEM,
+    user: notesText.slice(0, 20_000),
+    tier: "balanced",
+    agent: "tutor.questions",
+    fallback: QUESTION_FALLBACK,
+  });
   return safeParse(txt);
 }
 
 export async function gradeAnswer({ question, expected, answer }) {
-  const client = await getClient();
-  const txt = await client.ask(GRADE_SYSTEM, `Q: ${question}\nExpected: ${expected}\nStudent: ${answer}`);
+  const txt = await ask({
+    system: GRADE_SYSTEM,
+    user: `Q: ${question}\nExpected: ${expected}\nStudent: ${answer}`,
+    tier: "fast",
+    agent: "tutor.grade",
+    fallback: GRADE_FALLBACK,
+  });
   return safeParse(txt);
 }
 

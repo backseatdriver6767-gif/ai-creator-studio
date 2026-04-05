@@ -6,7 +6,14 @@
 // most retail traders can actually capture is the edge of NOT losing to
 // themselves.
 
-import { getClient } from "./client.mjs";
+import { ask } from "./client.mjs";
+
+const FALLBACK = `## Summary stats
+(Stub — set ANTHROPIC_API_KEY to run coach)
+## Patterns detected
+- None available without LLM access.
+## One thing to fix this week
+- Review your last 20 trades for R-multiple consistency.`;
 
 const SYSTEM = `You are a trading behavior coach. You read a user's trade
 journal and look for self-inflicted patterns. You are kind but honest.
@@ -27,8 +34,7 @@ Output markdown with:
 Never recommend increasing size or trading more frequently.`;
 
 export async function coachReport(trades) {
-  const client = await getClient();
   const user = `Trade journal (JSONL):
 ${trades.map((t) => JSON.stringify(t)).join("\n")}`;
-  return client.ask(SYSTEM, user);
+  return ask({ system: SYSTEM, user, tier: "balanced", agent: "coach", fallback: FALLBACK });
 }
