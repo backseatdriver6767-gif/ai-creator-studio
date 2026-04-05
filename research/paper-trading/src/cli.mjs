@@ -76,6 +76,8 @@ import { riskReport } from "./risk/varCvar.mjs";
 import { rollingSharpe, underwaterCurve, monthlyReturnGrid, renderMonthlyGrid } from "./report/rollingMetrics.mjs";
 import { evaluateKillSwitch } from "./decision/killSwitch.mjs";
 import { loadAllFills, filterFills, roundTrips, edgeSummary } from "./journal/query.mjs";
+import { initAccount, currentEquity, syncFromSources, equityHistory, isInitialized } from "./journal/account.mjs";
+import { runWatchlistBuild, readLatestWatchlist } from "./screeners/watchlistRunner.mjs";
 import { logPlan, markPlan, adherenceStats, readAllPlans } from "./decision/tradePlan.mjs";
 import { preTradeChecklist } from "./decision/preTradeChecklist.mjs";
 import { notify } from "./notify/index.mjs";
@@ -524,6 +526,109 @@ async function cmdMonthlyGrid(args) {
   console.log(renderMonthlyGrid(grid, `${symbol} monthly returns %`));
 }
 
+// ---------- Account ledger ----------
+
+async function cmdAccountInit(args) {
+  const balance = Number(args.balance || args["starting-balance"] || 10000);
+  const force = args.force === "true" || args.force === true;
+  if (await isInitialized() && !force) {
+    console.log("Account already initialized. Use --force to reset.");
+    console.log(JSON.stringify(await currentEquity(), null, 2));
+    return;
+  }
+  const ev = await initAccount({ startingBalance: balance, force });
+  console.log(`Account initialized at ${ev.startingBalance} ${ev.currency}`);
+}
+
+async function cmdAccountStatus() {
+  const state = await currentEquity();
+  if (!state.initialized) {
+    console.log("Account not initialized. Run: node src/cli.mjs account-init --balance 10000");
+    return;
+  }
+  const sign = state.realizedPnl >= 0 ? "+" : "";
+  console.log(`Starting balance : $${state.startingBalance.toFixed(2)} ${state.currency}`);
+  console.log(`Current equity   : $${state.equity.toFixed(2)}`);
+  console.log(`Realized P&L     : ${sign}$${state.realizedPnl.toFixed(2)} (${sign}${state.returnPct.toFixed(2)}%)`);
+  console.log(`Closed trades    : ${state.closedTrades}`);
+  console.log(`Open positions   : ${state.openTrades}`);
+}
+
+async function cmdAccountSync() {
+  if (!(await isInitialized())) {
+    console.log("Account not initialized. Run account-init first.");
+    return;
+  }
+  const r = await syncFromSources();
+  console.log(`Synced: added=${r.added} skipped=${r.skipped}`);
+  await cmdAccountStatus();
+}
+
+async function cmdAccountHistory(args) {
+  const limit = Number(args.limit || 20);
+  const series = await equityHistory();
+  if (!series.length) {
+    console.log("No account history. Run account-init first.");
+    return;
+  }
+  const tail = series.slice(-limit);
+  console.table(
+    tail.map((p) => ({
+      when: String(p.t).slice(0, 19),
+      equity: p.equity,
+      delta: p.delta,
+      key: p.key,
+    })),
+  );
+}
+
+async function cmdWatchlistBuild(args) {
+  const topN = Number(args.top || args.topN || 5);
+  const lookback = Number(args.lookback || 400);
+  console.log(`Building watchlist (top=${topN}, lookback=${lookback}d)…`);
+  const entry = await runWatchlistBuild({ topN, lookbackDays: lookback });
+  console.log(
+    `Fetched ${entry.fetched}/${entry.universeSize} symbols` +
+      (entry.fetchErrors ? ` (${entry.fetchErrors} failed)` : "") +
+      `. ${entry.eligible} eligible, ${entry.survivors} survived liquidity floor.`,
+  );
+  if (!entry.topN.length) {
+    console.log("No survivors. Try lowering liquidity floor or expanding universe.");
+    return;
+  }
+  console.table(
+    entry.topN.map((r) => ({
+      symbol: r.symbol,
+      score: r.score,
+      lastClose: r.lastClose,
+      lastDate: r.lastDate,
+      avgDollarVol20d: r.avgDollarVol20d,
+      reasons: r.reasons.join(" | ") || "(baseline)",
+    })),
+  );
+  console.log(`\nAppended to journal/watchlist.jsonl (${entry.date}).`);
+}
+
+async function cmdWatchlistLatest() {
+  const entry = await readLatestWatchlist();
+  if (!entry) {
+    console.log("No watchlist runs yet. Run: node src/cli.mjs watchlist-build");
+    return;
+  }
+  console.log(
+    `Latest watchlist: ${entry.date} (${entry.fetched}/${entry.universeSize} fetched, ${entry.survivors} survivors)`,
+  );
+  console.table(
+    entry.topN.map((r) => ({
+      symbol: r.symbol,
+      score: r.score,
+      lastClose: r.lastClose,
+      lastDate: r.lastDate,
+      reasons: Array.isArray(r.reasons) ? r.reasons.join(" | ") : "",
+    })),
+  );
+}
+
 function cmdKillSwitch(args) {
   const snap = {
     sessionStartEquity: Number(args["session-start"]),
@@ -601,6 +706,8 @@ Commands:
   notify
   cointegration | hurst | var-report | rolling | monthly-grid | kill-switch
   trades
+  account-init | account-status | account-sync | account-history
+  watchlist-build | watchlist-latest
   curriculum | runs
 
 Run with --help on any subcommand name for usage stubs; see src/cli.mjs source for the full list.`;
@@ -631,6 +738,12 @@ async function main() {
     "monthly-grid": cmdMonthlyGrid,
     "kill-switch": cmdKillSwitch,
     trades: cmdTrades,
+    "account-init": cmdAccountInit,
+    "account-status": cmdAccountStatus,
+    "account-sync": cmdAccountSync,
+    "account-history": cmdAccountHistory,
+    "watchlist-build": cmdWatchlistBuild,
+    "watchlist-latest": cmdWatchlistLatest,
     curriculum: cmdCurriculum, runs: cmdRuns,
   };
   const fn = table[cmd];

@@ -51,6 +51,8 @@ import { rollingSharpe, rollingMaxDrawdown, underwaterCurve, monthlyReturnGrid, 
 import { evaluateKillSwitch, applyTradeResult, DEFAULT_LIMITS } from "../src/decision/killSwitch.mjs";
 import { filterFills, roundTrips, edgeSummary } from "../src/journal/query.mjs";
 import { randomSearch, enumerateGrid } from "../src/engine/randomSearch.mjs";
+import { reduceEvents, buildEquityHistory } from "../src/journal/account.mjs";
+import { buildWatchlist } from "../src/screeners/watchlistBuilder.mjs";
 
 function mulberry32(a) {
   return function () {
@@ -624,6 +626,162 @@ ok("randomSearch respects early stopping", async () => {
 ok("enumerateGrid expands intRange", () => {
   const g = enumerateGrid({ a: { intRange: [1, 3] }, b: { choices: ["x", "y"] } });
   assert.equal(g.length, 6);
+});
+
+// ---------- Account ledger ----------
+ok("account reducer returns uninitialized on empty log", () => {
+  const s = reduceEvents([]);
+  assert.equal(s.initialized, false);
+  assert.equal(s.equity, 0);
+});
+ok("account reducer applies init + two closed trades", () => {
+  const events = [
+    { type: "init", ts: "2026-01-01T00:00:00Z", startingBalance: 10000, currency: "USD" },
+    { type: "trade-closed", ts: "2026-01-05T00:00:00Z", closedAt: "2026-01-05", key: "shadow:a", pnl: 125.5 },
+    { type: "trade-closed", ts: "2026-01-10T00:00:00Z", closedAt: "2026-01-10", key: "shadow:b", pnl: -50.25 },
+  ];
+  const s = reduceEvents(events, { openPositions: 2 });
+  assert.equal(s.initialized, true);
+  assert.equal(s.startingBalance, 10000);
+  assert.equal(s.realizedPnl, 75.25);
+  assert.equal(s.equity, 10075.25);
+  assert.equal(s.closedTrades, 2);
+  assert.equal(s.openTrades, 2);
+  assert.equal(s.returnPct, 0.75); // rounded to 2dp by reducer
+});
+ok("account reducer supports force-reset via second init", () => {
+  const events = [
+    { type: "init", ts: "2026-01-01T00:00:00Z", startingBalance: 10000 },
+    { type: "trade-closed", ts: "2026-01-05T00:00:00Z", closedAt: "2026-01-05", key: "shadow:a", pnl: 500 },
+    { type: "init", ts: "2026-02-01T00:00:00Z", startingBalance: 20000 },
+    { type: "trade-closed", ts: "2026-02-10T00:00:00Z", closedAt: "2026-02-10", key: "shadow:c", pnl: 100 },
+  ];
+  const s = reduceEvents(events);
+  // Only events after the LAST init count.
+  assert.equal(s.startingBalance, 20000);
+  assert.equal(s.realizedPnl, 100);
+  assert.equal(s.equity, 20100);
+  assert.equal(s.closedTrades, 1);
+});
+ok("account reducer ignores non-finite pnl", () => {
+  const events = [
+    { type: "init", ts: "2026-01-01T00:00:00Z", startingBalance: 10000 },
+    { type: "trade-closed", closedAt: "2026-01-02", key: "x", pnl: null },
+    { type: "trade-closed", closedAt: "2026-01-03", key: "y", pnl: "not-a-number" },
+    { type: "trade-closed", closedAt: "2026-01-04", key: "z", pnl: 10 },
+  ];
+  const s = reduceEvents(events);
+  assert.equal(s.realizedPnl, 10);
+  assert.equal(s.closedTrades, 1);
+});
+ok("equity history builds monotonic series ordered by closedAt", () => {
+  const events = [
+    { type: "init", ts: "2026-01-01T00:00:00Z", startingBalance: 10000 },
+    // Deliberately out of order:
+    { type: "trade-closed", ts: "2026-01-10T00:00:00Z", closedAt: "2026-01-10", key: "b", pnl: -200 },
+    { type: "trade-closed", ts: "2026-01-05T00:00:00Z", closedAt: "2026-01-05", key: "a", pnl: 300 },
+    { type: "trade-closed", ts: "2026-01-15T00:00:00Z", closedAt: "2026-01-15", key: "c", pnl: 50 },
+  ];
+  const series = buildEquityHistory(events);
+  assert.equal(series.length, 4); // init + 3 trades
+  assert.equal(series[0].equity, 10000);
+  assert.equal(series[1].equity, 10300); // a (2026-01-05)
+  assert.equal(series[2].equity, 10100); // b (2026-01-10)
+  assert.equal(series[3].equity, 10150); // c (2026-01-15)
+});
+ok("equity history is empty when no init event", () => {
+  const s = buildEquityHistory([{ type: "trade-closed", closedAt: "2026-01-01", key: "x", pnl: 100 }]);
+  assert.equal(s.length, 0);
+});
+
+// ── Watchlist builder ────────────────────────────────────
+//
+// Helper to fabricate a symbol with realistic bar count and liquidity.
+function fakeBars({ n = 260, basePrice = 100, baseVol = 2_000_000, lastCloseMult = 1, lastVolMult = 1, lastOpenMult = 1 }) {
+  const bars = [];
+  const start = new Date("2025-01-02");
+  for (let i = 0; i < n; i++) {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    const date = d.toISOString().slice(0, 10);
+    // slow, smooth drift so the last-bar becomes the "event"
+    const drift = 1 + Math.sin(i / 17) * 0.002;
+    const close = basePrice * drift;
+    const open = close * 0.999;
+    const high = close * 1.001;
+    const low = close * 0.998;
+    bars.push({ date, open, high, low, close, volume: baseVol });
+  }
+  // Apply the "today" overrides so the last bar can trigger screeners
+  const last = bars[bars.length - 1];
+  last.close = last.close * lastCloseMult;
+  last.open = last.close * lastOpenMult;
+  last.high = Math.max(last.open, last.close) * 1.001;
+  last.low = Math.min(last.open, last.close) * 0.998;
+  last.volume = Math.round(baseVol * lastVolMult);
+  return bars;
+}
+
+ok("watchlist builder returns empty topN for empty universe", () => {
+  const r = buildWatchlist({}, { topN: 5 });
+  assert.equal(r.universeSize, 0);
+  assert.equal(r.eligible, 0);
+  assert.equal(r.survivors, 0);
+  assert.equal(r.topN.length, 0);
+});
+
+ok("watchlist builder drops symbols below minBars", () => {
+  const bars = fakeBars({ n: 30 }); // fewer than default minBars=60
+  const r = buildWatchlist({ LOWVOL: bars }, { topN: 5 });
+  assert.equal(r.universeSize, 1);
+  assert.equal(r.eligible, 0);
+  assert.equal(r.survivors, 0);
+});
+
+ok("watchlist builder applies liquidity floor", () => {
+  // 1M shares * $5 close = $5M/day — below $10M floor
+  const bars = fakeBars({ n: 260, basePrice: 5, baseVol: 1_000_000 });
+  const r = buildWatchlist({ ILLIQ: bars }, { topN: 5 });
+  assert.equal(r.eligible, 1);
+  assert.equal(r.survivors, 0);
+});
+
+ok("watchlist builder scores relVol spike and ranks it above baseline", () => {
+  const quiet = fakeBars({ n: 260, basePrice: 100, baseVol: 3_000_000 });
+  const spike = fakeBars({ n: 260, basePrice: 100, baseVol: 3_000_000, lastVolMult: 3 });
+  const r = buildWatchlist({ QUIET: quiet, SPIKE: spike }, { topN: 5 });
+  assert.equal(r.survivors, 2);
+  assert.equal(r.topN[0].symbol, "SPIKE");
+  assert.ok(r.topN[0].score > r.topN[1].score);
+  assert.ok(r.topN[0].reasons.some((s) => s.startsWith("relVol=")));
+});
+
+ok("watchlist builder scores overnight gap", () => {
+  const flat = fakeBars({ n: 260, basePrice: 50, baseVol: 5_000_000 });
+  // Gap up 4% from previous close to open
+  const gappy = fakeBars({ n: 260, basePrice: 50, baseVol: 5_000_000, lastOpenMult: 1.04 });
+  const r = buildWatchlist({ FLAT: flat, GAPPY: gappy }, { topN: 5 });
+  assert.equal(r.survivors, 2);
+  assert.equal(r.topN[0].symbol, "GAPPY");
+  assert.ok(r.topN[0].reasons.some((s) => s.startsWith("gap=")));
+});
+
+ok("watchlist builder sort is deterministic (score desc, symbol asc)", () => {
+  // Two symbols with the exact same last-bar profile should tie-break alphabetically
+  const a = fakeBars({ n: 260, basePrice: 80, baseVol: 4_000_000, lastVolMult: 2 });
+  const b = fakeBars({ n: 260, basePrice: 80, baseVol: 4_000_000, lastVolMult: 2 });
+  const r = buildWatchlist({ BETA: b, ALPHA: a }, { topN: 5 });
+  assert.equal(r.survivors, 2);
+  assert.equal(r.topN[0].symbol, "ALPHA");
+  assert.equal(r.topN[1].symbol, "BETA");
+});
+
+ok("watchlist builder topN respects requested size", () => {
+  const bars = (mult) => fakeBars({ n: 260, basePrice: 100, baseVol: 3_000_000, lastVolMult: mult });
+  const r = buildWatchlist({ A: bars(3), B: bars(2.5), C: bars(2), D: bars(1.5), E: bars(1.2) }, { topN: 3 });
+  assert.equal(r.survivors, 5);
+  assert.equal(r.topN.length, 3);
+  assert.equal(r.topN[0].symbol, "A");
 });
 
 if (failed > 0) { console.error(`\n${failed} test(s) failed`); process.exit(1); }

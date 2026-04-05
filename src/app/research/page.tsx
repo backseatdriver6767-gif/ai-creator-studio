@@ -33,6 +33,111 @@ type Trip = {
   exitAt: string;
 };
 
+type AccountEvent =
+  | { type: "init"; ts: string; startingBalance: number; currency?: string }
+  | { type: "trade-closed"; ts: string; key: string; pnl: number; closedAt?: string; symbol?: string };
+
+type AccountSnapshot = {
+  initialized: boolean;
+  startingBalance: number;
+  currency: string;
+  realizedPnl: number;
+  equity: number;
+  returnPct: number;
+  closedTrades: number;
+  openTrades: number;
+};
+
+type ShadowRec = {
+  shadowId: string;
+  status: "open" | "closed";
+  symbol: string;
+  side: "BUY" | "SHORT";
+  qty: number;
+  entry: number;
+  entryDate?: string;
+  stop?: number;
+  target?: number;
+  setup?: string;
+  exit?: number;
+  pnl?: number;
+  openedAt?: string;
+  closedAt?: string;
+};
+
+type WatchlistEntry = {
+  ts: string;
+  date: string;
+  universe?: string;
+  universeSize?: number;
+  fetched?: number;
+  eligible?: number;
+  survivors?: number;
+  topN: Array<{
+    symbol: string;
+    score: number;
+    reasons: string[];
+    lastClose: number;
+    lastDate: string;
+    avgDollarVol20d: number;
+  }>;
+};
+
+type LlmUsageRow = {
+  ts: string;
+  agent: string;
+  tier: string;
+  model?: string;
+  stub?: boolean;
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  stopReason?: string | null;
+  error?: string;
+};
+
+// Mirror of research/paper-trading/src/journal/account.mjs `reduceEvents`,
+// reimplemented in TS so the dashboard can reduce the event log without
+// importing the .mjs module across package boundaries. Pure.
+function reduceAccount(events: AccountEvent[], openPositions: number): AccountSnapshot {
+  let initIdx = -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].type === "init") { initIdx = i; break; }
+  }
+  if (initIdx < 0) {
+    return {
+      initialized: false, startingBalance: 0, currency: "USD",
+      realizedPnl: 0, equity: 0, returnPct: 0,
+      closedTrades: 0, openTrades: openPositions,
+    };
+  }
+  const init = events[initIdx] as Extract<AccountEvent, { type: "init" }>;
+  let realized = 0, closed = 0;
+  for (let i = initIdx + 1; i < events.length; i++) {
+    const e = events[i];
+    if (e.type === "trade-closed" && Number.isFinite(e.pnl)) {
+      realized += e.pnl;
+      closed += 1;
+    }
+  }
+  const equity = init.startingBalance + realized;
+  const returnPct = (realized / init.startingBalance) * 100;
+  return {
+    initialized: true,
+    startingBalance: init.startingBalance,
+    currency: init.currency ?? "USD",
+    realizedPnl: round(realized, 2),
+    equity: round(equity, 2),
+    returnPct: round(returnPct, 2),
+    closedTrades: closed,
+    openTrades: openPositions,
+  };
+}
+
+function round(x: number, d: number): number {
+  const p = 10 ** d;
+  return Math.round(x * p) / p;
+}
+
 // Build a cumulative P&L series from closed trades, ordered by exit time.
 function buildCumulativePnl(trades: Trip[]): Array<{ t: number; cum: number }> {
   const sorted = trades
@@ -123,9 +228,214 @@ function SharpeBars({ runs, width = 1040, height = 180 }: { runs: Run[]; width?:
   );
 }
 
+// Account header: starting $, current equity, P&L (abs + %), open positions.
+function AccountHeader({ snap }: { snap: AccountSnapshot }) {
+  if (!snap.initialized) {
+    return (
+      <div style={{ border: "1px dashed #333", padding: 16, marginBottom: 32, color: "#888" }}>
+        No account initialized yet. Run{" "}
+        <code>node research/paper-trading/src/cli.mjs account-init --balance 10000</code>{" "}
+        to start tracking a hypothetical ledger. Not live money.
+      </div>
+    );
+  }
+  const sign = snap.realizedPnl >= 0 ? "+" : "";
+  const pnlColor = snap.realizedPnl >= 0 ? "#6c6" : "#c66";
+  const cell = { flex: 1, minWidth: 140 };
+  const label = { color: "#888", fontSize: 11, textTransform: "uppercase" as const, letterSpacing: 0.5 };
+  const value = { fontSize: 22, fontWeight: 600 as const, color: "#eee" };
+  return (
+    <div
+      style={{
+        border: "1px solid #222",
+        background: "#0b0b0b",
+        padding: 20,
+        marginBottom: 32,
+        display: "flex",
+        gap: 24,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={cell}>
+        <div style={label}>Starting balance</div>
+        <div style={value}>${snap.startingBalance.toFixed(2)}</div>
+        <div style={{ color: "#666", fontSize: 11 }}>{snap.currency}</div>
+      </div>
+      <div style={cell}>
+        <div style={label}>Current equity</div>
+        <div style={value}>${snap.equity.toFixed(2)}</div>
+      </div>
+      <div style={cell}>
+        <div style={label}>Realized P&amp;L</div>
+        <div style={{ ...value, color: pnlColor }}>
+          {sign}${snap.realizedPnl.toFixed(2)}
+        </div>
+        <div style={{ color: pnlColor, fontSize: 11 }}>
+          {sign}
+          {snap.returnPct.toFixed(2)}%
+        </div>
+      </div>
+      <div style={cell}>
+        <div style={label}>Trades</div>
+        <div style={value}>
+          {snap.closedTrades}
+          <span style={{ color: "#666", fontSize: 14 }}> closed</span>
+        </div>
+        <div style={{ color: "#666", fontSize: 11 }}>{snap.openTrades} open</div>
+      </div>
+    </div>
+  );
+}
+
+// Today's watchlist panel.
+function WatchlistPanel({ entry }: { entry: WatchlistEntry | null }) {
+  if (!entry) {
+    return (
+      <div style={{ color: "#888", fontSize: 12, padding: 12, border: "1px dashed #333" }}>
+        No watchlist generated yet. Run{" "}
+        <code>node research/paper-trading/src/cli.mjs watchlist-build</code>.
+      </div>
+    );
+  }
+  return (
+    <div>
+      <p style={{ color: "#888", fontSize: 11, marginTop: 0 }}>
+        {entry.date} · {entry.fetched ?? 0}/{entry.universeSize ?? 0} fetched ·{" "}
+        {entry.survivors ?? 0} survivors
+      </p>
+      {entry.topN.length === 0 ? (
+        <p style={{ color: "#888" }}>Empty topN. Adjust universe or liquidity floor.</p>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
+              <th style={{ padding: 6 }}>Symbol</th>
+              <th>Score</th>
+              <th>Last close</th>
+              <th>As of</th>
+              <th>Reasons</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entry.topN.map((r) => (
+              <tr key={r.symbol} style={{ borderBottom: "1px solid #222" }}>
+                <td style={{ padding: 6, fontWeight: 600 }}>{r.symbol}</td>
+                <td>{r.score.toFixed(2)}</td>
+                <td>${r.lastClose.toFixed(2)}</td>
+                <td style={{ color: "#666" }}>{r.lastDate}</td>
+                <td style={{ color: "#aaa" }}>{r.reasons.join(" · ") || "(baseline)"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// Open shadow positions (research blotter, not live).
+function OpenPositions({ open }: { open: ShadowRec[] }) {
+  if (open.length === 0) {
+    return (
+      <p style={{ color: "#888", fontSize: 12 }}>
+        No open shadow positions. All shadow trades are hypothetical — there is no broker.
+      </p>
+    );
+  }
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <thead>
+        <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
+          <th style={{ padding: 6 }}>Symbol</th>
+          <th>Side</th>
+          <th>Qty</th>
+          <th>Entry</th>
+          <th>Stop</th>
+          <th>Target</th>
+          <th>Setup</th>
+          <th>Opened</th>
+        </tr>
+      </thead>
+      <tbody>
+        {open.map((r) => (
+          <tr key={r.shadowId} style={{ borderBottom: "1px solid #222" }}>
+            <td style={{ padding: 6, fontWeight: 600 }}>{r.symbol}</td>
+            <td style={{ color: r.side === "BUY" ? "#6c6" : "#c66" }}>{r.side}</td>
+            <td>{r.qty}</td>
+            <td>${r.entry.toFixed(2)}</td>
+            <td>{r.stop != null ? `$${r.stop.toFixed(2)}` : ""}</td>
+            <td>{r.target != null ? `$${r.target.toFixed(2)}` : ""}</td>
+            <td style={{ color: "#aaa" }}>{r.setup ?? ""}</td>
+            <td style={{ color: "#666" }}>{(r.openedAt ?? r.entryDate ?? "").slice(0, 10)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// Agent activity feed — last N LLM calls from journal/llm-usage.jsonl.
+function AgentFeed({ rows }: { rows: LlmUsageRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p style={{ color: "#888", fontSize: 12 }}>
+        No agent activity logged yet. Runs are recorded to{" "}
+        <code>journal/llm-usage.jsonl</code>.
+      </p>
+    );
+  }
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+      <thead>
+        <tr style={{ textAlign: "left", borderBottom: "1px solid #333" }}>
+          <th style={{ padding: 6 }}>Time</th>
+          <th>Agent</th>
+          <th>Tier</th>
+          <th>Mode</th>
+          <th>Tokens</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => {
+          const inTok = r.tokensIn ?? 0;
+          const outTok = r.tokensOut ?? 0;
+          const mode = r.stub ? "stub" : r.error ? "error" : "live";
+          const modeColor = r.stub ? "#888" : r.error ? "#c66" : "#6c6";
+          return (
+            <tr key={`${r.ts}-${i}`} style={{ borderBottom: "1px solid #222" }}>
+              <td style={{ padding: 6, color: "#666" }}>{r.ts.slice(0, 19)}</td>
+              <td>{r.agent}</td>
+              <td style={{ color: "#aaa" }}>{r.tier}</td>
+              <td style={{ color: modeColor }}>{mode}</td>
+              <td style={{ color: "#aaa" }}>
+                {inTok}↓ {outTok}↑
+              </td>
+              <td style={{ color: "#888" }}>{r.error ?? r.stopReason ?? ""}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+// Read the last watchlist entry from the JSONL log. Server-side, O(file).
+async function readLatestWatchlistEntry(): Promise<WatchlistEntry | null> {
+  const all = await readJsonl<WatchlistEntry>("watchlist.jsonl");
+  return all.length ? all[all.length - 1] : null;
+}
+
 export default async function ResearchPage() {
   const runs = (await readJsonl<Run>("runs.jsonl")).slice(-20).reverse();
-  const trades = (await readJsonl<Trip>("manual-trades.jsonl"));
+  const trades = await readJsonl<Trip>("manual-trades.jsonl");
+  const accountEvents = await readJsonl<AccountEvent>("account.jsonl");
+  const shadows = await readJsonl<ShadowRec>("shadow-book.jsonl");
+  const usageRows = (await readJsonl<LlmUsageRow>("llm-usage.jsonl")).slice(-20).reverse();
+  const latestWatchlist = await readLatestWatchlistEntry();
+
+  const openPositions = shadows.filter((s) => s.status === "open");
+  const accountSnap = reduceAccount(accountEvents, openPositions.length);
 
   const totalPnl = trades
     .filter((t) => "pnl" in t)
@@ -140,9 +450,26 @@ export default async function ResearchPage() {
         Read-only. No trade entry. Paper/simulation only.
       </p>
 
+      <AccountHeader snap={accountSnap} />
+
+      <section style={{ marginBottom: 40 }}>
+        <h2 style={{ fontSize: 18 }}>Today&apos;s watchlist (screener-picked)</h2>
+        <WatchlistPanel entry={latestWatchlist} />
+      </section>
+
+      <section style={{ marginBottom: 40 }}>
+        <h2 style={{ fontSize: 18 }}>Open shadow positions</h2>
+        <OpenPositions open={openPositions} />
+      </section>
+
       <section style={{ marginBottom: 40 }}>
         <h2 style={{ fontSize: 18 }}>Cumulative P&amp;L (manual journal)</h2>
         <SparklinePnl series={equity} />
+      </section>
+
+      <section style={{ marginBottom: 40 }}>
+        <h2 style={{ fontSize: 18 }}>Agent activity (last 20 LLM calls)</h2>
+        <AgentFeed rows={usageRows} />
       </section>
 
       <section style={{ marginBottom: 40 }}>

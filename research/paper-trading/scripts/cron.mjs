@@ -14,7 +14,8 @@
 // journal/ directory.
 
 import { spawn } from "node:child_process";
-import { mkdir, appendFile } from "node:fs/promises";
+import { mkdir, appendFile, readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,11 +23,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const CLI = path.resolve(ROOT, "src/cli.mjs");
 const LOG_DIR = path.resolve(ROOT, "journal");
+const WATCHLIST_JSONL = path.resolve(LOG_DIR, "watchlist.jsonl");
 
-const WATCHLIST = (process.env.WATCHLIST || "SPY,QQQ,IWM")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+// Fallback list used when the screener has no output yet (first run, or
+// every provider failed). Deliberately tiny so cron always has something
+// to do and never silently skips downstream steps.
+const FALLBACK_WATCHLIST = ["SPY", "QQQ", "IWM"];
+
+// An explicit WATCHLIST env variable still overrides everything. Otherwise
+// the cron lets the screener pick the day's symbols.
+const ENV_WATCHLIST = process.env.WATCHLIST
+  ? process.env.WATCHLIST.split(",").map((s) => s.trim()).filter(Boolean)
+  : null;
+const SKIP_SCREENER = process.env.PAPER_TRADING_SKIP_SCREENER === "1";
+const WATCHLIST_TOP_N = Number(process.env.WATCHLIST_TOP_N || 5);
 
 const today = new Date().toISOString().slice(0, 10);
 const LOG_FILE = path.join(LOG_DIR, `cron-${today}.log`);
@@ -72,17 +82,64 @@ function runStep(name, args) {
   });
 }
 
+async function resolveWatchlist() {
+  // 1. Explicit env override always wins.
+  if (ENV_WATCHLIST?.length) {
+    await logLine(`watchlist source=env symbols=${ENV_WATCHLIST.join(",")}`);
+    return ENV_WATCHLIST;
+  }
+  // 2. Screener step (disabled via env flag, e.g. for offline dry-runs).
+  if (!SKIP_SCREENER) {
+    const res = await runStep("watchlist-build", [
+      "watchlist-build",
+      "--top",
+      String(WATCHLIST_TOP_N),
+    ]);
+    if (res.ok && existsSync(WATCHLIST_JSONL)) {
+      try {
+        const raw = await readFile(WATCHLIST_JSONL, "utf8");
+        const lines = raw.trim().split("\n").filter(Boolean);
+        if (lines.length > 0) {
+          const latest = JSON.parse(lines[lines.length - 1]);
+          const picks = Array.isArray(latest.topN)
+            ? latest.topN.map((r) => r.symbol).filter(Boolean)
+            : [];
+          if (picks.length) {
+            await logLine(`watchlist source=screener symbols=${picks.join(",")}`);
+            return picks;
+          }
+          await logLine(`watchlist screener produced 0 picks, falling back`);
+        }
+      } catch (e) {
+        await logLine(`watchlist read failed: ${e.message}`);
+      }
+    } else {
+      await logLine(`watchlist screener step failed (code=${res.code}), falling back`);
+    }
+  } else {
+    await logLine(`watchlist screener skipped (PAPER_TRADING_SKIP_SCREENER=1)`);
+  }
+  // 3. Hard-coded fallback — tiny, always resolvable.
+  await logLine(`watchlist source=fallback symbols=${FALLBACK_WATCHLIST.join(",")}`);
+  return FALLBACK_WATCHLIST;
+}
+
 async function main() {
   await mkdir(LOG_DIR, { recursive: true });
-  await logLine(`==== nightly research loop ${today} watchlist=${WATCHLIST.join(",")} ====`);
+  await logLine(`==== nightly research loop ${today} ====`);
 
   const summary = [];
   const record = async (name, res) => {
     summary.push({ step: name, ok: res.ok, code: res.code });
   };
 
+  // 0. Resolve today's watchlist. This is a step in its own right so any
+  //    failure is visible in the summary at the end of the log.
+  const watchlist = await resolveWatchlist();
+  await logLine(`resolved watchlist=${watchlist.join(",")}`);
+
   // 1. Per-symbol research iteration.
-  for (const sym of WATCHLIST) {
+  for (const sym of watchlist) {
     await record(
       `research:${sym}`,
       await runStep(`research:${sym}`, ["research", "--symbol", sym, "--iterations", "1"]),
@@ -90,7 +147,7 @@ async function main() {
   }
 
   // 2. Per-symbol rolling metrics (read-only snapshot).
-  for (const sym of WATCHLIST) {
+  for (const sym of watchlist) {
     await record(
       `rolling:${sym}`,
       await runStep(`rolling:${sym}`, ["rolling", "--symbol", sym, "--window", "63"]),
@@ -106,7 +163,7 @@ async function main() {
   // 5. Daily digest — written last so it can pick up the other outputs.
   await record(
     "digest",
-    await runStep("digest", ["digest", "--symbols", WATCHLIST.join(",")]),
+    await runStep("digest", ["digest", "--symbols", watchlist.join(",")]),
   );
 
   // Final summary line, machine-parseable.
