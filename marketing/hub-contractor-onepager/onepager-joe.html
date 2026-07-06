@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>HUB International — Contractor Insurance Program</title>
+<style>
+  /* ---------- Print / page geometry ---------- */
+  @page { size: Letter; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root{
+    --navy-900:#141d27;
+    --navy-800:#1a2530;
+    --navy-700:#2a3845;
+    --navy-600:#3a4a5c;
+    --slate-300:#c6d0da;
+    --slate-400:#aeb9c4;
+    --slate-500:#6b7a88;
+    --paper:#f1f4f7;
+    --line:#e2e8f0;
+    --gold:#b8862b;
+    --gold-soft:#d4a94e;
+    --brand-blue:#2f79d6;
+    --brand-blue-light:#5aa2f0;
+    --ok:#2e7d5b;
+  }
+
+  html,body{ background:#8a94a0; }
+  body{
+    font-family:"Segoe UI", Calibri, "Helvetica Neue", Arial, sans-serif;
+    color:var(--navy-800);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  .page{
+    position:relative;
+    width:8.5in;
+    height:11in;
+    margin:0 auto;
+    background:#ffffff;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---------- Logo (recreated as crisp vector) ---------- */
+  .hub-logo{ display:flex; align-items:center; gap:11px; }
+  .hub-ring{ width:34px; height:34px; flex:0 0 auto; }
+  .hub-word{
+    font-weight:800; font-size:26px; letter-spacing:.5px;
+    color:#fff; line-height:1;
+  }
+
+  /* ---------- Header band ---------- */
+  header{
+    background:
+      radial-gradient(120% 160% at 100% 0%, rgba(47,121,214,.20) 0%, rgba(47,121,214,0) 55%),
+      linear-gradient(180deg, var(--navy-800) 0%, var(--navy-900) 100%);
+    color:#fff;
+    padding:26px 46px 24px;
+    position:relative;
+  }
+  header::after{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:3px;
+    background:linear-gradient(90deg, var(--gold) 0%, var(--gold-soft) 45%, rgba(212,169,78,0) 100%);
+  }
+  .header-top{ display:flex; align-items:center; justify-content:space-between; }
+  .header-tag{
+    font-size:10px; letter-spacing:2.4px; font-weight:700; text-transform:uppercase;
+    color:var(--gold-soft);
+  }
+  .header-tag .sub{ display:block; color:var(--slate-400); font-weight:600; letter-spacing:2px; margin-top:3px; }
+
+  .hero{ margin-top:20px; display:flex; align-items:flex-end; justify-content:space-between; gap:24px; }
+  .hero h1{
+    font-size:33px; line-height:1.03; font-weight:800; letter-spacing:-.4px;
+    text-transform:uppercase;
+  }
+  .hero h1 .thin{ display:block; font-weight:400; color:var(--slate-300); font-size:16px; letter-spacing:3px; margin-bottom:9px; }
+  .hero .pitch{
+    font-size:14px; color:var(--gold-soft); font-weight:600; margin-top:11px; letter-spacing:.2px;
+  }
+
+  /* service region chips */
+  .regions{ display:flex; flex-direction:column; gap:9px; flex:0 0 auto; }
+  .region{
+    display:flex; align-items:center; gap:10px;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.10);
+    border-radius:8px; padding:9px 13px; min-width:172px;
+  }
+  .region .dot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 0 3px rgba(255,255,255,.06); }
+  .region.live .dot{ background:#37c26b; box-shadow:0 0 0 3px rgba(55,194,107,.18); }
+  .region.soon .dot{ background:transparent; border:2px solid var(--slate-400); box-shadow:none; }
+  .region .txt{ display:flex; flex-direction:column; gap:2px; }
+  .region .txt .k{ font-size:8.5px; letter-spacing:1.6px; text-transform:uppercase; color:var(--slate-400); font-weight:700; }
+  .region .txt .v{ font-size:15px; font-weight:800; letter-spacing:.5px; color:#fff; line-height:1.1; }
+  .region.soon .txt .v{ color:var(--slate-300); }
+
+  /* ---------- Savings callout ---------- */
+  .savings{
+    margin:0 46px; margin-top:-16px; position:relative; z-index:2;
+    background:#fff; border:1px solid var(--line); border-left:4px solid var(--gold);
+    border-radius:10px; padding:16px 20px;
+    box-shadow:0 10px 26px -14px rgba(20,29,39,.35);
+    display:flex; align-items:center; gap:16px;
+  }
+  .savings .pct{
+    font-size:30px; font-weight:800; color:var(--gold); line-height:1; letter-spacing:-1px; flex:0 0 auto;
+  }
+  .savings .pct small{ display:block; font-size:9px; letter-spacing:1.5px; color:var(--slate-500); font-weight:700; text-transform:uppercase; margin-top:4px; }
+  .savings .body{ font-size:12.5px; line-height:1.5; color:var(--navy-700); }
+  .savings .body b{ color:var(--navy-800); }
+
+  /* ---------- Main content ---------- */
+  main{ padding:28px 46px 0; flex:1 1 auto; display:flex; flex-direction:column; gap:30px; }
+
+  .sec-head{ display:flex; align-items:center; gap:12px; margin-bottom:13px; }
+  .sec-num{
+    font-size:12px; font-weight:800; color:var(--gold);
+    border:1.5px solid var(--gold); border-radius:6px; padding:3px 8px; letter-spacing:.5px;
+  }
+  .sec-title{ font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:1.6px; color:var(--navy-800); }
+  .sec-title .muted{ color:var(--slate-500); font-weight:600; }
+  .sec-rule{ flex:1 1 auto; height:1px; background:linear-gradient(90deg,var(--line),transparent); }
+
+  /* Who we cover — trade grid */
+  .trades{ display:grid; grid-template-columns:repeat(3,1fr); gap:11px; }
+  .trade{
+    background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    padding:13px 14px; display:flex; align-items:center; gap:10px;
+  }
+  .trade .ic{ width:22px; height:22px; flex:0 0 auto; color:var(--brand-blue); }
+  .trade .nm{ font-size:12.5px; font-weight:600; color:var(--navy-700); }
+
+  /* The difference — two columns */
+  .cols{ display:grid; grid-template-columns:1.15fr 1fr; gap:22px; }
+  .why-list{ list-style:none; display:flex; flex-direction:column; gap:16px; }
+  .why-list li{ display:flex; gap:11px; font-size:12.5px; line-height:1.35; color:var(--navy-700); }
+  .why-list li .chk{
+    flex:0 0 auto; width:18px; height:18px; border-radius:50%;
+    background:rgba(184,134,43,.12); color:var(--gold);
+    display:flex; align-items:center; justify-content:center; margin-top:1px;
+  }
+  .why-list li b{ color:var(--navy-800); }
+
+  .coverage{
+    background:linear-gradient(180deg,var(--navy-800),var(--navy-900));
+    border-radius:12px; padding:18px 20px; color:#fff;
+    position:relative; overflow:hidden;
+  }
+  .coverage::before{
+    content:""; position:absolute; top:-40px; right:-40px; width:130px; height:130px; border-radius:50%;
+    background:radial-gradient(circle, rgba(47,121,214,.28), transparent 70%);
+  }
+  .coverage .kicker{ font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--gold-soft); font-weight:700; }
+  .coverage h3{ font-size:16px; font-weight:800; margin:5px 0 3px; letter-spacing:.3px; }
+  .coverage .note{ font-size:11px; color:var(--slate-400); margin-bottom:13px; }
+  .cov-list{ list-style:none; display:grid; grid-template-columns:1fr; gap:8px; position:relative; z-index:1; }
+  .cov-list li{ display:flex; align-items:center; gap:9px; font-size:12px; font-weight:600; color:var(--slate-300); }
+  .cov-list li .b{ width:6px; height:6px; border-radius:50%; background:var(--gold-soft); flex:0 0 auto; }
+  .cov-list li b{ color:#fff; font-weight:600; }
+
+  /* ---------- Trust strip ---------- */
+  .trust{
+    margin-top:auto;
+    display:flex; align-items:center; justify-content:center; gap:0;
+    padding:15px 46px; border-top:1px solid var(--line);
+  }
+  .trust .item{ display:flex; align-items:center; gap:8px; padding:0 26px; }
+  .trust .item + .item{ border-left:1px solid var(--line); }
+  .trust .ic{ width:17px; height:17px; color:var(--gold); flex:0 0 auto; }
+  .trust .lbl{ font-size:11px; font-weight:700; color:var(--navy-700); letter-spacing:.3px; }
+
+  /* ---------- Footer / contacts ---------- */
+  footer{
+    background:var(--paper); border-top:2px solid var(--gold);
+    padding:16px 46px 18px;
+  }
+  .cta{ font-size:13px; font-weight:700; color:var(--navy-800); margin-bottom:12px; display:flex; align-items:center; gap:9px; }
+  .cta .arw{ color:var(--gold); }
+  .contacts{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .contacts.one{ grid-template-columns:1fr; }
+  .contacts.one .contact{
+    background:#fff; border:1px solid var(--line); border-radius:10px;
+    padding:14px 18px; max-width:420px;
+    box-shadow:0 6px 18px -12px rgba(20,29,39,.3);
+  }
+  .contacts.one .av{ width:46px; height:46px; font-size:16px; }
+  .contacts.one .nm{ font-size:15px; }
+  .contact{ display:flex; gap:12px; align-items:flex-start; }
+  .contact .av{
+    width:40px; height:40px; border-radius:50%; flex:0 0 auto;
+    background:linear-gradient(180deg,var(--navy-700),var(--navy-800)); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; letter-spacing:.5px;
+  }
+  .contact .nm{ font-size:13.5px; font-weight:800; color:var(--navy-800); line-height:1.1; }
+  .contact .rl{ font-size:10.5px; color:var(--slate-500); font-weight:600; margin:2px 0 6px; }
+  .contact .meta{ font-size:11px; color:var(--navy-700); line-height:1.6; }
+  .contact .meta a{ color:var(--navy-700); text-decoration:none; }
+  .contact .meta .lbl{ color:var(--gold); font-weight:800; margin-right:5px; }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <header>
+      <div class="header-top">
+        <div class="hub-logo">
+          <svg class="hub-ring" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="hubg" x1="15" y1="12" x2="80" y2="88" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#63b3f2"/>
+                <stop offset="1" stop-color="#2f5fb0"/>
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="34" stroke="url(#hubg)" stroke-width="16"/>
+          </svg>
+          <span class="hub-word">HUB</span>
+        </div>
+        <div class="header-tag" style="text-align:right;">
+          Contractor Insurance Program
+          <span class="sub">HUB International</span>
+        </div>
+      </div>
+
+      <div class="hero">
+        <div>
+          <h1><span class="thin">BUILT FOR THE TRADES</span>Contractor<br>Insurance Program</h1>
+          <div class="pitch">One carrier.&nbsp; Better coverage.&nbsp; Lower cost.</div>
+        </div>
+        <div class="regions">
+          <div class="region live">
+            <span class="dot"></span>
+            <span class="txt"><span class="k">Now Serving</span><span class="v">Long Island</span></span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="savings">
+      <div class="pct">10–20%<small>Typical Savings</small></div>
+      <div class="body">
+        Currently with <b>State Farm, Merchants, Utica, or The Hartford?</b> We can likely save you
+        <b>10–20% on GL, Auto, and Umbrella</b> — bundled under one A-rated carrier, including
+        <b>Action&nbsp;Over</b> coverage.
+      </div>
+    </div>
+
+    <main>
+      <!-- 01 WHO WE COVER -->
+      <section>
+        <div class="sec-head">
+          <span class="sec-num">01</span>
+          <span class="sec-title">Who We Cover</span>
+          <span class="sec-rule"></span>
+        </div>
+        <div class="trades">
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6a3 3 0 0 0 6 0V3"/><path d="M12 12v9"/><path d="M8 21h8"/></svg><span class="nm">Plumbers</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span class="nm">Electricians</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h10M8 8h.01M12 8h.01M16 8h.01M8 12h8"/></svg><span class="nm">HVAC</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="m5 21 2-9 5-3 5 3 2 9"/><path d="M9 21v-4h6v4"/></svg><span class="nm">Drywall &amp; Painting</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v4H3z"/><path d="M3 12v8h18v-8"/><path d="M7 8V4h4v4M13 12v8M7 12v8"/></svg><span class="nm">Paving &amp; Masonry</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20"/><path d="M5 12a7 7 0 0 1 14 0"/><path d="M4 16h16M6 20h12"/></svg><span class="nm">Pool Companies</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V10"/><path d="M12 10a5 5 0 0 1 5-5 5 5 0 0 1-5 5Z"/><path d="M12 12a5 5 0 0 0-5-5 5 5 0 0 0 5 5Z"/></svg><span class="nm">Landscapers</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9M15 6h.01"/></svg><span class="nm">Kitchen &amp; Bath</span></div>
+          <div class="trade"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 4 5 5"/><path d="M3 21l3-1 11-11-2-2L4 18z"/><path d="M14 6l4 4"/></svg><span class="nm">Interior Carpenters</span></div>
+        </div>
+      </section>
+
+      <!-- 02 THE DIFFERENCE -->
+      <section>
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <span class="sec-title">The Difference &nbsp;<span class="muted">— Why Contractors Switch</span></span>
+          <span class="sec-rule"></span>
+        </div>
+        <div class="cols">
+          <ul class="why-list">
+            <li><span class="chk"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Long Island is all we do</b> — local relationships, real appetite.</span></li>
+            <li><span class="chk"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Bundled programs</b> that cut cost, not coverage.</span></li>
+            <li><span class="chk"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>2-day quote turnaround</b> once we have your info.</span></li>
+            <li><span class="chk"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>A-rated carriers</b> with strong contractor appetite.</span></li>
+            <li><span class="chk"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Hands-on renewal strategy</b> every single year.</span></li>
+          </ul>
+
+          <div class="coverage">
+            <div class="kicker">Exclusive Contractor Program</div>
+            <h3>One-Carrier Coverage</h3>
+            <div class="note">Everything under one A-rated roof.</div>
+            <ul class="cov-list">
+              <li><span class="b"></span><b>General Liability</b></li>
+              <li><span class="b"></span><b>Commercial Auto</b></li>
+              <li><span class="b"></span><b>Umbrella / Excess Liability</b></li>
+              <li><span class="b"></span><b>Workers' Compensation</b></li>
+              <li><span class="b"></span><b>Tools, Equipment &amp; Inland Marine</b></li>
+              <li><span class="b"></span><b>Property &amp; BOP</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="trust">
+      <div class="item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.3 8 11 4.6-2.7 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></svg><span class="lbl">A-Rated Carriers</span></div>
+      <div class="item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg><span class="lbl">Action Over Coverage Included</span></div>
+      <div class="item"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span class="lbl">2-Day Quote Turnaround</span></div>
+    </div>
+
+    <footer>
+      <div class="cta"><span class="arw">➜</span> Let's review your policies and show you the savings.</div>
+      <div class="contacts one">
+        <div class="contact">
+          <div class="av">JG</div>
+          <div>
+            <div class="nm">Joseph Giustino</div>
+            <div class="rl">Business Development Executive · HUB International</div>
+            <div class="meta">
+              <div><span class="lbl">C</span>516-286-0229</div>
+              <div><a href="mailto:Joseph.Giustino@hubinternational.com">Joseph.Giustino@hubinternational.com</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+</body>
+</html>
