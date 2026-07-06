@@ -1,0 +1,12 @@
+import pkg from '/opt/node22/lib/node_modules/playwright/index.js';
+const { chromium } = pkg;
+const dir = new URL('.', import.meta.url).pathname;
+const b = await chromium.launch();
+const p = await b.newPage();
+await p.goto('file://' + dir + 'onepager-joe.html', { waitUntil:'networkidle' });
+await p.pdf({ path: dir + 'HUB-Contractor-OnePager-Joe.pdf', width:'8.5in', height:'11in', printBackground:true, pageRanges:'1' });
+const p2 = await b.newPage({ viewport:{ width:816, height:1056 }, deviceScaleFactor:2 });
+await p2.goto('file://' + dir + 'onepager-joe.html', { waitUntil:'networkidle' });
+await p2.screenshot({ path: dir + 'preview-joe.png', fullPage:true });
+await b.close();
+console.log('joe ok');
