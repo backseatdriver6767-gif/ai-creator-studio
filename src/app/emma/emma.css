@@ -1,0 +1,368 @@
+/* ─────────────────────────────────────────────────────────────
+   By Emma Catherine — scoped styles
+   A warm, gallery-paper aesthetic. All rules are namespaced under
+   .emma-root so nothing here touches the rest of the app.
+   ───────────────────────────────────────────────────────────── */
+
+.emma-root {
+  --paper: #f6f1e9;
+  --paper-2: #efe8dc;
+  --ink: #211d18;
+  --ink-soft: #4a443b;
+  --muted: #8a8073;
+  --line: #dfd6c6;
+  --clay: #a85a34;
+  --clay-soft: #c68a5f;
+
+  color-scheme: light;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.emma-root ::selection {
+  background: var(--clay);
+  color: var(--paper);
+}
+
+.emma-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Header ------------------------------------------------------- */
+.emma-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem clamp(1.25rem, 5vw, 3.5rem);
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.4s ease, background 0.4s ease;
+}
+.emma-header[data-scrolled="true"] {
+  border-bottom-color: var(--line);
+}
+.emma-wordmark {
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  letter-spacing: 0.02em;
+}
+.emma-nav {
+  display: flex;
+  gap: clamp(1rem, 3vw, 2.25rem);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.emma-nav a {
+  color: var(--ink-soft);
+  position: relative;
+  padding-bottom: 2px;
+}
+.emma-nav a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 1px;
+  background: var(--clay);
+  transition: width 0.3s ease;
+}
+.emma-nav a:hover { color: var(--ink); }
+.emma-nav a:hover::after { width: 100%; }
+@media (max-width: 640px) {
+  .emma-nav { display: none; }
+}
+
+/* Layout primitives ------------------------------------------- */
+.emma-wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-inline: clamp(1.25rem, 5vw, 3.5rem);
+}
+.emma-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Hero --------------------------------------------------------- */
+.emma-hero {
+  padding-block: clamp(3.5rem, 11vw, 8rem) clamp(2.5rem, 7vw, 5rem);
+  text-align: center;
+}
+.emma-hero h1 {
+  font-size: clamp(3rem, 11vw, 8rem);
+  line-height: 0.94;
+  margin-block: 0.6rem 1.2rem;
+}
+.emma-hero .emma-tagline {
+  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  color: var(--ink-soft);
+  max-width: 34ch;
+  margin-inline: auto;
+  font-style: italic;
+}
+
+/* Gallery ------------------------------------------------------ */
+.emma-gallery {
+  columns: 3 260px;
+  column-gap: clamp(0.9rem, 2.2vw, 1.6rem);
+  padding-block: 1rem;
+}
+.emma-piece {
+  break-inside: avoid;
+  margin-bottom: clamp(0.9rem, 2.2vw, 1.6rem);
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+.emma-piece-frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.emma-piece-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), filter 0.5s ease;
+}
+.emma-piece:hover .emma-piece-frame img { transform: scale(1.035); }
+.emma-piece-sold {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.28rem 0.55rem;
+}
+.emma-piece-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.7rem 0.15rem 0.2rem;
+}
+.emma-piece-meta .t {
+  font-family: var(--font-display), serif;
+  font-size: 1.02rem;
+}
+.emma-piece-meta .m {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.emma-piece-price {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* Section frame ------------------------------------------------ */
+.emma-section {
+  padding-block: clamp(3.5rem, 9vw, 7rem);
+}
+.emma-rule {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  margin: 0;
+}
+.emma-section h2 {
+  font-size: clamp(1.9rem, 5vw, 3rem);
+  line-height: 1.05;
+  margin-bottom: 1.4rem;
+}
+.emma-prose p {
+  font-size: clamp(1.05rem, 2.2vw, 1.2rem);
+  line-height: 1.7;
+  color: var(--ink-soft);
+  max-width: 54ch;
+  margin-bottom: 1.1rem;
+}
+.emma-two-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: start;
+}
+@media (min-width: 820px) {
+  .emma-two-col { grid-template-columns: 0.85fr 1.15fr; }
+}
+
+/* Buttons ------------------------------------------------------ */
+.emma-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.85rem 1.5rem;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+.emma-btn:hover { background: var(--ink); color: var(--paper); }
+.emma-btn--solid { background: var(--ink); color: var(--paper); }
+.emma-btn--solid:hover { background: var(--clay); border-color: var(--clay); }
+
+/* Socials ------------------------------------------------------ */
+.emma-socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+.emma-social {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  padding: 0.7rem 1.1rem;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+.emma-social:hover { border-color: var(--ink); background: var(--paper-2); }
+.emma-social .l {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.emma-social .h {
+  font-family: var(--font-display), serif;
+  font-size: 1rem;
+}
+
+/* Newsletter --------------------------------------------------- */
+.emma-signup {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  max-width: 460px;
+}
+.emma-signup input {
+  flex: 1 1 220px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  padding: 0.7rem 0.2rem;
+  font-size: 1rem;
+  color: var(--ink);
+  outline: none;
+}
+.emma-signup input::placeholder { color: var(--muted); }
+
+/* Footer ------------------------------------------------------- */
+.emma-footer {
+  padding-block: clamp(2.5rem, 6vw, 4rem);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* Lightbox ----------------------------------------------------- */
+.emma-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: color-mix(in srgb, var(--ink) 78%, transparent);
+  backdrop-filter: blur(6px);
+  padding: clamp(1rem, 4vw, 3rem);
+  overflow-y: auto;
+}
+.emma-lightbox-inner {
+  margin: auto;
+  width: min(1000px, 100%);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(1.25rem, 4vw, 2.5rem);
+  background: var(--paper);
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+@media (min-width: 780px) {
+  .emma-lightbox-inner { grid-template-columns: 1.4fr 1fr; align-items: center; }
+}
+.emma-lightbox img {
+  width: 100%;
+  height: auto;
+  max-height: 78vh;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+}
+.emma-lightbox-meta h3 {
+  font-family: var(--font-display), serif;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+.emma-lightbox-meta dl {
+  margin: 1.2rem 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.4rem 1.2rem;
+  font-size: 0.92rem;
+}
+.emma-lightbox-meta dt {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  align-self: center;
+}
+.emma-lightbox-meta dd { color: var(--ink-soft); }
+.emma-lightbox-close {
+  position: fixed;
+  top: 1.1rem;
+  right: 1.25rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+/* Reveal animation -------------------------------------------- */
+.emma-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.emma-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .emma-reveal { opacity: 1; transform: none; transition: none; }
+  .emma-piece-frame img { transition: none; }
+}
