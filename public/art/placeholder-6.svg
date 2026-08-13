@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 950" width="800" height="950" role="img" aria-label="Placeholder artwork: Before the Day">
+  <defs>
+    <linearGradient id="p6bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8ddd0"/>
+      <stop offset="0.6" stop-color="#d3bfa6"/>
+      <stop offset="1" stop-color="#b48f74"/>
+    </linearGradient>
+    <filter id="p6grain"><feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.05"/></feComponentTransfer><feComposite operator="over" in2="SourceGraphic"/></filter>
+  </defs>
+  <rect width="800" height="950" fill="url(#p6bg)"/>
+  <path d="M0 600 Q 200 540 400 590 T 800 580 L 800 950 L 0 950 Z" fill="#9c7452" opacity="0.8"/>
+  <path d="M0 700 Q 220 650 420 700 T 800 690 L 800 950 L 0 950 Z" fill="#75513a"/>
+  <ellipse cx="400" cy="300" rx="220" ry="150" fill="#f2e4cd" opacity="0.4"/>
+  <circle cx="400" cy="300" r="52" fill="#fbf0dc" opacity="0.9"/>
+  <rect width="800" height="950" filter="url(#p6grain)" opacity="0.6"/>
+</svg>

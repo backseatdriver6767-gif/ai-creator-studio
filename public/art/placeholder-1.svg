@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="800" height="1000" role="img" aria-label="Placeholder artwork: First Light">
+  <defs>
+    <linearGradient id="p1sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4e7d6"/>
+      <stop offset="0.55" stop-color="#e9cfae"/>
+      <stop offset="1" stop-color="#d99b73"/>
+    </linearGradient>
+    <radialGradient id="p1sun" cx="0.62" cy="0.34" r="0.4">
+      <stop offset="0" stop-color="#fff6e9"/>
+      <stop offset="1" stop-color="#fff6e9" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="p1grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.05"/></feComponentTransfer><feComposite operator="over" in2="SourceGraphic"/></filter>
+  </defs>
+  <rect width="800" height="1000" fill="url(#p1sky)"/>
+  <rect width="800" height="1000" fill="url(#p1sun)"/>
+  <path d="M0 720 C 180 660 320 700 460 690 C 600 680 720 640 800 660 L 800 1000 L 0 1000 Z" fill="#b06a45" opacity="0.85"/>
+  <path d="M0 800 C 200 760 360 800 520 786 C 660 774 740 760 800 770 L 800 1000 L 0 1000 Z" fill="#8a4f34"/>
+  <circle cx="496" cy="340" r="70" fill="#fbe9cf"/>
+  <rect width="800" height="1000" filter="url(#p1grain)" opacity="0.6"/>
+</svg>

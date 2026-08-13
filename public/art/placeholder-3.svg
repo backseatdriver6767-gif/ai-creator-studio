@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000" role="img" aria-label="Placeholder artwork: The Long Afternoon">
+  <defs>
+    <linearGradient id="p3bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e7dcc9"/>
+      <stop offset="1" stop-color="#cdb896"/>
+    </linearGradient>
+    <filter id="p3grain"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.05"/></feComponentTransfer><feComposite operator="over" in2="SourceGraphic"/></filter>
+  </defs>
+  <rect width="1000" height="1000" fill="url(#p3bg)"/>
+  <rect x="0" y="0" width="1000" height="560" fill="#dcc8a4"/>
+  <rect x="120" y="140" width="360" height="470" fill="#a9805a" opacity="0.9"/>
+  <rect x="150" y="170" width="300" height="410" fill="#c79a6b"/>
+  <rect x="560" y="230" width="300" height="380" fill="#7d5b3f" opacity="0.85"/>
+  <path d="M0 560 L1000 560 L1000 1000 L0 1000 Z" fill="#8f6f4b"/>
+  <path d="M120 610 L480 610 L470 1000 L150 1000 Z" fill="#6f5236" opacity="0.6"/>
+  <circle cx="300" cy="360" r="24" fill="#f3e6cd"/>
+  <rect width="1000" height="1000" filter="url(#p3grain)" opacity="0.6"/>
+</svg>
